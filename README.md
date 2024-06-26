@@ -22,12 +22,102 @@ En resumen, Hibernate simplifica el desarrollo de aplicaciones Java al proporcio
 
 > Sección generada por ChatGPT
 
+## [Configuration and bootstrap](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration)
+
+### [Including Hibernate in your project build](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#required-dependencies)
+
+Para utilizar Hibernate fuera del entorno de un contenedor como WildFly o [Quarkus](https://quarkus.io/guides/hibernate-orm), se necesita:
+
+- incluir el propio Hibernate ORM, junto con el controlador JDBC apropiado, como dependencias del su proyecto
+
+- configurar Hibernate con información sobre la base de datos, especificando propiedades de configuración.
+
+Añadir la dependencia de Hibernate tanto en Gradle como en Maven:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.hibernate</groupId>
+        <artifactId>hibernate-core</artifactId>
+        <version>{version}</version>
+    </dependency>
+</dependencies>
+```
+
+Reemplazando `{version}` por la versión de Hibernate a utilizar.
+
+Hibernate se divide en varios módulos/artefactos bajo el grupo `org.hibernate.orm`. El artefacto principal se llama `hibernate-core`. Algunos de los módulos se encuentran [aquí](https://docs.jboss.org/hibernate/orm/6.5/quickstart/html_single/#modules).
+
+Hibernate también proporciona un módulo de plataforma (**BOM** en terminología Maven) que se puede utilizar para alinear las versiones de los módulos de Hibernate junto con las versiones de sus bibliotecas. El artefacto de la plataforma se denomina `hibernate-platform`.
+
+Para utilizar la plataforma BOM en Maven:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.hibernate.orm</groupId>
+        <artifactId>hibernate-core</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>jakarta.transaction</groupId>
+        <artifactId>jakarta.transaction-api</artifactId>
+    </dependency>
+</dependencies>
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-platform</artifactId>
+            <version>6.5.2.Final</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+También se debe agregar una dependencia para el controlador JDBC de la base de datos utilizada:
+
+- PostgreSQL or CockroachDB -> `org.postgresql:postgresql:{version}`
+
+- MySQL or TiDB -> `com.mysql:mysql-connector-j:{version}`
+
+- MariaDB -> `org.mariadb.jdbc:mariadb-java-client:{version}`
+
+- DB2 -> `com.ibm.db2:jcc:{version}`
+
+- SQL Server -> `com.microsoft.sqlserver:mssql-jdbc:${version}`
+
+- Oracle -> `com.oracle.database.jdbc:ojdbc11:${version}`
+
+- H2 -> `com.h2database:h2:{version}`
+
+- HSQLDB -> `org.hsqldb:hsqldb:{version}`
+
+Donde `{versión}` es la última versión del controlador JDBC para la base de datos.
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <version>2.2.224</version>
+    </dependency>
+</dependencies>    
+```
+
+### [Optional dependencies](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#optional-dependencies)
+
+Opcionalmente, también se puede agregar dependencias opcionales para trabajar con Hibernate como por ejemplo [SLF4J](http://www.slf4j.org/) o un [Query Validator](https://github.com/hibernate/query-validator/) para comprobar las sentencias HQL en tiempo de compilación.
+
+La lista está disponible en la documentación oficial.
+
 ---
 
 ## Enlaces de interés
 
 - 🔸 [Hibernate](https://hibernate.org/)
-- [Hibernate Guide](https://hibernate.org/orm/documentation/6.4/)
+- [Hibernate Guide](https://hibernate.org/orm/documentation/6.5/)
 - [Hibernate Getting Started](https://hibernate.org/orm/documentation/getting-started/)
 - <https://www.baeldung.com/tag/hibernate>
 
