@@ -112,13 +112,136 @@ Opcionalmente, también se puede agregar dependencias opcionales para trabajar c
 
 La lista está disponible en la documentación oficial.
 
+### [Configuration using JPA XML](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration-jpa)
+
+Siguiendo el enfoque estándar JPA, se proporcionaría un archivo llamado `persistence.xml`, que generalmente se coloca en el directorio `META-INF` de un archivo de persistencia, es decir, del archivo o directorio .jar que contiene las clases de entidad.
+
+```xml
+<persistence xmlns="http://java.sun.com/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://java.sun.com/xml/ns/persistence 
+                https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd"
+             version="2.0">
+
+    <persistence-unit name="org.hibernate.example">
+        <class>org.hibernate.example.Book</class>
+        <class>org.hibernate.example.Author</class>
+        <properties>
+            <!-- PostgreSQL -->
+            <property name="jakarta.persistence.jdbc.url" 
+                    value="jdbc:postgresql://localhost/example"/>
+
+            <!-- Credentials -->
+            <property name="jakarta.persistence.jdbc.user" value="gavin"/>
+            <property name="jakarta.persistence.jdbc.password" value="hibernate"/>
+
+            <!-- Automatic schema export -->
+            <property name="jakarta.persistence.schema-generation.database.action"
+                      value="drop-and-create"/>
+
+            <!-- SQL statement logging -->
+            <property name="hibernate.show_sql" value="true"/>
+            <property name="hibernate.format_sql" value="true"/>
+            <property name="hibernate.highlight_sql" value="true"/>
+        </properties>
+    </persistence-unit>
+</persistence>
+```
+
+Cada elemento `<class>` especifica el nombre completo de una clase de entidad.
+
+En algunos entornos de contenedores, por ejemplo, en cualquier contenedor EE, los elementos `<class>` son innecesarios, ya que el contenedor escaneará el archivo en busca de clases anotadas y reconocerá automáticamente cualquier clase anotada como `@Entity`.
+
+Cada elemento `<property>` especifica una propiedad de configuración y su valor. En el ejemplo hay propiedades definidas en el estándar de JPA (`'jakarta.persistance'`) y otras propiedades son específicas de Hibernate (`'hibernate'`).
+
+Se puede obtener una `EntityManagerFactory` llamando a `Persistence.createEntityManagerFactory()`:
+
+```java
+EntityManagerFactory entityManagerFactory = 
+    Persistence.createEntityManagerFactory("org.hibernate.example");
+```
+
+Si fuera necesario, es posible anular las propiedades de configuración especificadas en el fichero `persistence.xml`:
+
+```java
+EntityManagerFactory entityManagerFactory =
+    Persistence.createEntityManagerFactory("org.hibernate.example",
+            Map.of(AvailableSettings.JAKARTA_JDBC_PASSWORD, password));
+```
+
+### [Configuration using Hibernate API](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration-api)
+
+Alternativamente, la venerable clase [Configuration](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/cfg/Configuration.html) permite configurar una instancia de Hibernate en código Java:
+
+```java
+SessionFactory sessionFactory =
+    new Configuration()
+        .addAnnotatedClass(Book.class)
+        .addAnnotatedClass(Author.class)
+        // PostgreSQL
+        .setProperty(AvailableSettings.JAKARTA_JDBC_URL, "jdbc:postgresql://localhost/example")
+        // Credentials
+        .setProperty(AvailableSettings.JAKARTA_JDBC_USER, user)
+        .setProperty(AvailableSettings.JAKARTA_JDBC_PASSWORD, password)
+        // Automatic schema export
+        .setProperty(AvailableSettings.JAKARTA_HBM2DDL_DATABASE_ACTION,
+                     Action.SPEC_ACTION_DROP_AND_CREATE)
+        // SQL statement logging
+        .setProperty(AvailableSettings.SHOW_SQL, true)
+        .setProperty(AvailableSettings.FORMAT_SQL, true)
+        .setProperty(AvailableSettings.HIGHLIGHT_SQL, true)
+        // Create a new SessionFactory
+        .buildSessionFactory();
+```
+
+La clase `Configuration` ha sobrevivido casi sin cambios desde las primeras versiones (anteriores a la 1.0) de Hibernate, por lo que no parece particularmente moderna. Por otro lado, es muy fácil de usar y expone algunas opciones que `persistence.xml` no admite.
+
+En realidad, la clase `Configuration` es solo una fachada muy simple para la API más moderna y más poderosa (pero más compleja) definida en el paquete `org.hibernate.boot`. Esta API es útil si se tienen requisitos avanzados, por ejemplo, en el desarrollo de un framework o un contenedor.
+
+### [Configuration using Hibernate properties file](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration-properties)
+
+Si se utiliza la API `Configuration` de Hibernate, pero se quiere evitar el uso de ciertas propiedades de configuración directamente en el código Java, se pueden especificar en un archivo llamado `hibernate.properties` y colocar el archivo en la ruta de clase raíz:
+
+```bash
+# PostgreSQL
+jakarta.persistence.jdbc.url=jdbc:postgresql://localhost/example
+# Credentials
+jakarta.persistence.jdbc.user=hibernate
+jakarta.persistence.jdbc.password=zAh7mY42MNshzAQ5
+
+# SQL statement logging
+hibernate.show_sql=true
+hibernate.format_sql=true
+hibernate.highlight_sql=true
+```
+
+### [Basic configuration settings](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#basic-configuration-settings)
+
+La clase [AvailableSettings](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/cfg/AvailableSettings.html) enumera todas las propiedades de configuración que entiende Hibernate.
+
+La lista es extensa, sin embargo la mayoría de estas propiedades rara vez se necesitan y muchas solo existen para brindar compatibilidad con versiones anteriores de Hibernate. Con raras excepciones, el comportamiento predeterminado de cada una de estas propiedades es el recomendable.
+
+Las propiedades que deben configurarse para empezar son:
+
+- **jakarta.persistence.jdbc.url**: la URL JDBC de la base de datos
+
+- **jakarta.persistence.jdbc.user**: credenciales de acceso a la base de datos
+
+- **jakarta.persistence.jdbc.password**: credenciales de acceso a la base de datos
+
+En términos de optimización de rendimiento, también es recomendable configurar la propiedad `hibernate.connection.pool_size`.
+
+### [Automatic schema export](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#automatic-schema-export)
+
+TODO
+
 ---
 
 ## Enlaces de interés
 
-- 🔸 [Hibernate](https://hibernate.org/)
-- [Hibernate Guide](https://hibernate.org/orm/documentation/6.5/)
-- [Hibernate Getting Started](https://hibernate.org/orm/documentation/getting-started/)
+- 🔸 <https://hibernate.org>
+- <https://hibernate.org/orm/documentation/6.5>
+- <https://hibernate.org/orm/documentation/getting-started>
 - <https://www.baeldung.com/tag/hibernate>
 
 ## Licencia
