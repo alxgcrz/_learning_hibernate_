@@ -1,5 +1,7 @@
 # Hibernate
 
+... DOCUMENTO EN DESARROLLO ...
+
 ## Introducción
 
 Hibernate es un poderoso **framework de mapeo objeto-relacional (ORM)** para Java que simplifica significativamente el proceso de interacción con bases de datos relacionales. Desarrollado inicialmente por Gavin King en 2001 y actualmente mantenido por Red Hat, Hibernate se ha convertido en una herramienta fundamental para desarrolladores Java que buscan gestionar la persistencia de datos de manera eficiente y transparente.
@@ -232,6 +234,60 @@ Las propiedades que deben configurarse para empezar son:
 En términos de optimización de rendimiento, también es recomendable configurar la propiedad `hibernate.connection.pool_size`.
 
 ### [Automatic schema export](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#automatic-schema-export)
+
+Esta característica de Hibernate es una característica que permite a Hibernate **generar y exportar automáticamente el esquema de la base de datos** basado en las entidades mapeadas en la aplicación. Esto puede incluir la creación, actualización, o eliminación de tablas, índices y llaves foráneas, entre otros elementos del esquema de la base de datos.
+
+Puede hacer que Hibernate infiera el esquema de su base de datos a partir de las anotaciones de mapeo que ha especificado en su código Java, y exportar el esquema al momento de la inicialización especificando una o más de las siguientes propiedades de configuración:
+
+- **jakarta.persistence.schema-generation.database.action**
+
+- **jakarta.persistence.create-database-schemas** (opcional)
+
+- **jakarta.persistence.schema-generation.create-source** (opcional)
+
+- **jakarta.persistence.schema-generation.create-script-source** (opcional)
+
+- **jakarta.persistence.sql-load-script-source** (opcional)
+
+Esta característica es extremadamente útil para realizar pruebas. Durante las fases iniciales de desarrollo o cuando se está creando un prototipo, es útil tener Hibernate manejando automáticamente el esquema.
+
+La forma más sencilla de preinicializar una base de datos con datos de prueba o "de referencia" es colocar una lista de declaraciones SQL de inserción en un archivo llamado, por ejemplo, _'import.sql'_, y especificar la ruta a este archivo utilizando la propiedad `jakarta.persistence.sql-load-script-source`.
+
+Este enfoque es más limpio que escribir código Java para instanciar entidades y llamar a `persist()` en cada una de ellas.
+
+### [Logging the generated SQL](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#logging-generated-sql)
+
+Para ver el SQL generado mientras se envía a la base de datos, tiene dos opciones.
+
+Una forma es establecer la propiedad `hibernate.show_sql=true`, y Hibernate registrará el SQL directamente en la consola. Puede hacer que la salida sea mucho más legible habilitando el formateo o el resaltado. Estas configuraciones son muy útiles para solucionar problemas con las declaraciones SQL generadas:
+
+- **hibernate.show_sql**: si es _'true'_, imprime el registro SQL directamente en la consola
+
+- **hibernate.format_sql**: si es _'true'_, imprime el registro SQL en un formato con sangría de varias líneas
+
+- **hibernate.highlight_sql**: si es _'true'_, imprime el registro SQL con resaltado de sintaxis mediante códigos de escape ANSI
+
+Como alternativa, puede habilitar el registro en nivel de depuración (debug) para la categoría `org.hibernate.SQL` utilizando su implementación preferida de logging **SLF4J**.
+
+### [Minimizing repetitive mapping information](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#minimizing)
+
+Las propiedades `hibernate.default_schema` o `hibernate.default_catalog`  son muy útiles para minimizar la cantidad de información que necesitará especificar explícitamente en las anotaciones `@Table` y `@Column`. [Más información](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#object-relational-mapping)
+
+Escribir su propia `PhysicalNamingStrategy` y/o `ImplicitNamingStrategy` es una forma especialmente buena de reducir el desorden de las anotaciones en las clases de entidad, e implementar sus convenciones de nomenclatura de base de datos.
+
+Por lo tanto, se debería hacer para cualquier modelo de datos que no sea trivial. [Más información](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#naming-strategies)
+
+### [Nationalized character data in SQL Server](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#nationalized-chars)
+
+Por defecto, los tipos _'char'_ y _'varchar'_ de **SQL Server** no admiten datos Unicode. Sin embargo, una cadena de Java puede contener cualquier carácter Unicode. Por lo tanto, si está trabajando con SQL Server, es posible que necesite forzar a Hibernate a usar los tipos de columna _'nchar'_ y _'nvarchar'_:
+
+- **hibernate.use_nationalized_character_data**: _'nchar'_ y _'nvarchar'_ en lugar de _'char'_ y _'varchar'_
+
+Por otro lado, si solo algunos campos almacenan datos nacionalizados, utilice la anotación `@Nationalized` para indicar los campos de sus entidades que mapean estos columnas.
+
+Como alternativa, puede configurar SQL Server para usar la intercalación habilitada para UTF-8 (_UTF8).
+
+## [Entities](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities)
 
 TODO
 
