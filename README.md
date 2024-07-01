@@ -448,6 +448,91 @@ Una entidad de subclase siempre hereda el atributo de identificador de la entida
 
 ### [Identifier attributes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#identifier-attributes)
 
+Un atributo de identificador suele ser un campo:
+
+```java
+@Entity
+class Book {
+    Book() {}
+
+    @Id
+    Long id;
+
+    ...
+}
+```
+
+Pero puede ser una propiedad:
+
+```java
+@Entity
+class Book {
+    Book() {}
+
+    private Long id;
+
+    @Id
+    Long getId() { return id; }
+    void setId(Long id) { this.id = id; }
+
+    ...
+}
+```
+
+Un atributo de identificador debe estar anotado como `@Id` o `@EmbeddedId`.
+
+Los valores del identificador pueden ser:
+
+- asignado por la aplicación, es decir, por el código Java
+
+- generado y asignado por Hibernate.
+
+### [Generated identifiers](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#generated-identifiers)
+
+Un identificador suele ser generado por el sistema, en cuyo caso debe anotarse con `@GeneratedValue`:
+
+```java
+@Id @GeneratedValue
+Long id;
+```
+
+JPA define las siguientes estrategias para generar identificadores:
+
+- **GenerationType.UUID**: se utiliza para generar identificadores únicos universales (UUID), que son valores de 128 bits generalmente representados como cadenas en formato estándar. Es útil cuando se necesitan identificadores únicos que sean globalmente únicos, no solo dentro de una tabla o una base de datos específica. El tipo en Java es UUID o String.
+
+- **GenerationType.IDENTITY**: la base de datos genera automáticamente un valor único cada vez que se inserta una nueva fila. El tipo en Java es Long o Integer.
+
+- **GenerationType.SEQUENCE**: utiliza una secuencia de la base de datos para generar valores únicos. El tipo en Java es Long o Integer.
+
+- **GenerationType.TABLE**: utiliza una tabla especial en la base de datos para generar valores únicos. El tipo en Java es Long o Integer.
+
+- **GenerationType.AUTO**: deja que el proveedor de persistencia elija la estrategia de generación más adecuada según la base de datos utilizada. El tipo en Java es Long o Integer.
+
+Las anotaciones `@SequenceGenerator` y `@TableGenerator` permiten un mayor control sobre la generación de SEQUENCE y TABLE respectivamente:
+
+```java
+@SequenceGenerator(name="bookSeq", sequenceName="seq_book", initialValue = 5, allocationSize=10)
+```
+
+Los valores se generan utilizando una secuencia de base de datos definida de la siguiente manera:
+
+```sql
+create sequence seq_book start with 5 increment by 10
+```
+
+De hecho, es muy común colocar la anotación `@SequenceGenerator` en el atributo `@Id` que hace uso de ella:
+
+```java
+@Id
+@GeneratedValue(strategy=SEQUENCE, generator="bookSeq")  // reference to generator defined below
+@SequenceGenerator(name="bookSeq", sequenceName="seq_book", initialValue = 5, allocationSize=10)
+Long id;
+```
+
+JPA proporciona un soporte bastante adecuado para las estrategias más comunes de generación de identificadores por el sistema. Sin embargo, para aquellas ocasiones en que no se adapta a los requisitios, Hibernate proporciona un marco muy bien diseñado para generadores definidos por el usuario.
+
+### [Natural keys as identifiers](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#natural-identifiers)
+
 TODO
 
 ---
