@@ -289,6 +289,165 @@ Como alternativa, puede configurar SQL Server para usar la intercalación habili
 
 ## [Entities](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities)
 
+Una entidad es una clase Java que representa datos en una tabla de una base de datos relacional. Decimos que la entidad hace un mapeo o se mapea a la tabla.
+
+Una entidad tiene atributos, que son propiedades o campos que se mapean a columnas de la tabla. En particular, cada entidad debe tener un identificador o id, que se mapea a la clave primaria de la tabla. El id nos permite asociar de manera única una fila de la tabla con una instancia de la clase Java, al menos dentro de un contexto de persistencia dado.
+
+Una instancia de una clase Java no puede sobrevivir fuera de la máquina virtual a la que pertenece. Sin embargo, podemos pensar que una instancia de entidad tiene un ciclo de vida que trasciende una instancia particular en la memoria. Al proporcionar su id a Hibernate, podemos volver a materializar la instancia en un nuevo contexto de persistencia, siempre que la fila asociada esté presente en la base de datos. Por lo tanto, las operaciones `persist()` y `remove()` pueden considerarse como marcadores del inicio y el fin del ciclo de vida de una entidad, al menos en cuanto a persistencia se refiere.
+
+Así, un id representa la identidad persistente de una entidad, una identidad que sobrevive a una instancia particular en la memoria. Y esta es una diferencia importante entre la clase de entidad en sí misma y los valores de sus atributos: la entidad tiene una identidad persistente y un ciclo de vida bien definido en relación con la persistencia, mientras que un `String` o `List` que representa uno de sus valores de atributo no lo tiene.
+
+Una entidad generalmente tiene asociaciones con otras entidades. Típicamente, una asociación entre dos entidades se mapea a una clave foránea en una de las tablas de la base de datos. Un grupo de entidades mutuamente asociadas a menudo se denomina modelo de dominio, aunque también es perfectamente válido el término modelo de datos.
+
+### [Entity classes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entity-clases)
+
+Un entidad debe ser **una clase no final** y **tener un constructor no privado y sin parámetros**.
+
+Por otro lado, la clase de entidad puede ser tanto concreta como abstracta, y puede tener cualquier cantidad de constructores adicionales. La clase entidad también puede ser una clase interna estática.
+
+Cada clase de entidad debe tener la anotación `@Entity`:
+
+```java
+@Entity
+class Book {
+    Book() {}
+    ...
+}
+```
+
+Alternativamente, la clase puede identificarse como un tipo de entidad proporcionando una asignación basada en XML para la clase:
+
+```xml
+<entity-mappings>
+    <package>org.hibernate.example</package>
+
+    <entity class="Book">
+        <attributes> ... </attributes>
+    </entity>
+
+    ...
+</entity-mappings>
+```
+
+### [Access types](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#access-type)
+
+En Hibernate, cada clase entidad puede definirse con un tipo de acceso predeterminado, que puede ser:
+
+- **acceso directo a campos** (_'field access'_)
+
+- **acceso a propiedades** (_'property access'_)
+
+Esta configuración determina cómo Hibernate accede y maneja los atributos de la clase entidad. Cuando se utiliza **acceso directo a campos**, los atributos de la clase entidad se acceden directamente a través de los campos de la clase. En este caso, Hibernate mapea directamente los atributos a los campos correspondientes en la tabla de la base de datos:
+
+```java
+@Entity
+public class Product {
+    
+    @Id
+    private Long id;
+
+    private String name;
+
+    // Getters y setters
+}
+```
+
+Cuando se utiliza **acceso a propiedades**, Hibernate accede a los atributos a través de métodos _'getter'_ y _'setter'_ en lugar de acceder directamente a los campos:
+
+```java
+@Entity
+public class Product {
+    
+    private Long id;
+    private String name;
+
+    @Id
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+Hibernate determina automáticamente el tipo de acceso de la entidad basándose en la ubicación de las anotaciones a nivel de atributo:
+
+- Si un atributo está anotado directamente con `@Id`, Hibernate utiliza **acceso directo a campos** para ese atributo.
+
+- Si un método _'getter'_ está anotado con `@Id`, Hibernate utiliza **acceso a propiedades** para ese atributo.
+
+### [Entity class inheritance](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entity-inheritance)
+
+Una clase de entidad que no extiende ninguna otra clase de entidad, se llama entidad raíz. Cada entidad raíz debe declarar un atributo de identificador.
+
+Una clase de entidad puede extender otra clase de entidad:
+
+```java
+// Entidad raíz
+@Entity
+class Book {
+    Book() {}
+    
+    @Id
+    private Long id;
+
+    private String name;
+
+    // Getters y setters
+}
+
+// Entidad subclase
+@Entity
+class AudioBook extends Book {
+    AudioBook() {}
+    
+    // Esta clase hereda los atributos de 'Book'
+}
+```
+
+Una entidad de subclase hereda **todos** los atributos persistentes de cada entidad que extiende. Además, en este caso Hibernate tratará a las dos clases como entidades con derecho propio, por lo que creará tablas para cada entidad.
+
+Sin embargo, si una clase se anota como `@MappedSuperclass`, Hibernate no la considera una entidad con derecho propio, por lo que no creará la tabla. La subclase que hereda de esta clase sigue heredando los atributos de la clase anotada como `@MappedSuperclass`:
+
+```java
+// Hibernate no crerá una tabla para esta entidad
+@MappedSuperclass
+class Book {
+    Book() {}
+    
+    @Id
+    private Long id;
+
+    private String name;
+
+    // Getters y setters
+}
+
+// Entidad subclase con tabla propia
+@Entity
+class AudioBook extends Book {
+    AudioBook() {}
+    
+    // Esta clase hereda los atributos de 'Book'
+}
+```
+
+Una clase de entidad raíz debe declarar un atributo anotado `@Id` o heredar uno de `@MappedSuperclass`.
+
+Una entidad de subclase siempre hereda el atributo de identificador de la entidad raíz y **no puede declarar su propio atributo `@Id`**.
+
+### [Identifier attributes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#identifier-attributes)
+
 TODO
 
 ---
