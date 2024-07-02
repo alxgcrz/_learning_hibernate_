@@ -533,11 +533,161 @@ JPA proporciona un soporte bastante adecuado para las estrategias más comunes d
 
 ### [Natural keys as identifiers](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#natural-identifiers)
 
-TODO
+No todos los atributos identificadores se mapean a una clave sustituta (generada por el sistema). Las claves primarias que son significativas para el usuario del sistema se llaman **claves naturales**.
+
+Cuando la clave primaria de una tabla es una clave natural, no anotamos el atributo identificador con `@GeneratedValue`, y es responsabilidad del código de la aplicación asignar un valor al atributo identificador. Únicamente se anota con `@Id`:
+
+```java
+@Entity
+class Book {
+    @Id
+    String isbn;
+
+    ...
+}
+```
+
+En resumen:
+
+- **Clave Sustituta (_"Surrogate Key"_)**: es una clave primaria generada por el sistema, como un número de identificación único o un UUID. Este tipo de clave no tiene significado intrínseco para los usuarios del sistema y se utiliza principalmente para identificar de manera única las filas en la tabla de la base de datos. Hibernate u otras tecnologías ORM pueden encargarse de generar automáticamente estos valores.
+
+- **Clave Natural (_"Natural Key"_)**: es una clave primaria que tiene un significado directo y relevante para los usuarios del sistema. Por ejemplo, el número de ISBN de un libro, el número de pasaporte de una persona o el código de producto. Estas claves son definidas o mantenidas por los usuarios o por el dominio del negocio, y no por la aplicación o la base de datos. En este caso, Hibernate no generará automáticamente los valores de estas claves; será responsabilidad del código de la aplicación asignar o gestionar estos valores.
+
+### [Composite identifiers](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#composite-identifiers)
+
+Si la base de datos utiliza claves compuestas, necesitará más de un atributo de identificador. Hay dos formas de asignar claves compuestas en JPA:
+
+- **usando un `@IdClass`**
+
+- **usando un `@EmbeddedId`**
+
+La forma recomendada es usar el tipo `@Embeddable` con la clave compuesta:
+
+```java
+@Embeddable
+record BookId(String isbn, int printing) {}
+```
+
+Ahora ya se puede utilizar la clave compuesta con `@EmbeddedId`:
+
+```java
+@Entity
+class Book {
+    Book() {}
+
+    @EmbeddedId
+    BookId bookId;
+
+    ...
+}
+```
+
+De igual manera, ahora podemos se puede usar la clave compuesta para obtener instancias de la entidad:
+
+```java
+Book book = session.find(Book.class, new BookId(isbn, printing));
+```
+
+### [Version attributes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#version-attributes)
+
+Una entidad puede tener un atributo que Hibernate utiliza para la verificación de bloqueo optimista. Un atributo de versión suele ser de tipo `Integer`, `Short`, `Long`, `LocalDateTime`, `OffsetDateTime`, `ZonedDateTime` o `Instant`. Este atributo se conoce comúnmente como **atributo de versión**.
+
+El atributo de versión se utiliza en Hibernate para implementar el bloqueo optimista. Esta técnica asegura que las actualizaciones concurrentes a la misma entidad por múltiples usuarios se gestionen correctamente para evitar la pérdida o inconsistencia de datos.
+
+```java
+@Version
+LocalDateTime lastUpdated;
+```
+
+Hibernate asigna automáticamente los atributos de versión cuando una entidad se vuelve persistente y los incrementa o actualiza automáticamente cada vez que se actualiza la entidad.
+
+En otras palabras, cuando se actualiza una entidad con un atributo de versión, Hibernate compara el valor actual del atributo de versión con el valor que se leyó inicialmente al recuperar la entidad de la base de datos.
+
+Si estos valores difieren, indica que otra transacción ha modificado la entidad desde que se leyó, y Hibernate puede decidir cómo manejar la situación (por ejemplo, lanzando una excepción o reintentando la operación).
+
+### [Natural id attributes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#natural-id-attributes)
+
+Incluso cuando una entidad tiene una clave sustituta (clave generada por el sistema), siempre debería ser posible identificar una combinación de campos que identifiquen de manera única una instancia de la entidad, desde el punto de vista del usuario del sistema. Esta combinación de campos es su **clave natural**.
+
+Anteriormente, consideramos el caso en que la clave natural coincide con la clave primaria. Aquí, la clave natural es una segunda clave única de la entidad, distinta de su clave primaria sustituta.
+
+Si no se puede identificar una clave natural, podría ser una señal de que el modelo de datos no es correcto.
+
+Dado que es extremadamente común recuperar una entidad basada en su clave natural, Hibernate tiene una manera de marcar los atributos de la entidad que componen su clave natural. Cada atributo debe ser anotado con `@NaturalId`.
+
+```java
+@Entity
+class Book {
+    Book() {}
+
+    @Id @GeneratedValue
+    Long id; // the system-generated surrogate key
+
+    @NaturalId
+    String isbn; // belongs to the natural key
+
+    @NaturalId
+    int printing; // also belongs to the natural key
+
+    ...
+}
+```
+
+Las claves naturales (`@NaturalId`) permiten búsquedas eficientes y validaciones de unicidad basadas en atributos significativos del modelo de negocio, mientras que las claves primarias o _'surrogate keys'_ (`@Id`) se utilizan principalmente para la gestión interna y referencial en la base de datos.
+
+Si se conoce el ID (clave subrogada) y/o los valores de los atributos que forman la clave natural, se puede realizar búsquedas utilizando cualquiera de ellos.
+
+### [Basic attributes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#basic-attributes)
+
+Un atributo básico de una entidad es un campo o propiedad que se asigna a una sola columna de la tabla de la base de datos asociada. La especificación JPA define un conjunto bastante limitado de tipos básicos:
+
+- **Primitive types**: boolean, int, double, etc
+
+- **Primitive wrappers**: Boolean, Integer, Double, etc
+
+- **Strings**: String
+
+- **Arbitrary-precision numeric types**: BigInteger, BigDecimal
+
+- **Date/time types**: LocalDate, LocalTime, LocalDateTime, OffsetDateTime, Instant
+
+- **Deprecated date/time types**: Date, Calendar
+
+- **Deprecated JDBC date/time types**: Date, Time, Timestamp
+
+- **Binary and character arrays**: byte[], char[]
+
+- **UUIDs**: UUID
+
+- **Enumerated types**: Any enum
+
+- **Serializable types**: Any type which implements java.io.Serializable
+
+Hibernate amplía ligeramente esta lista con los siguientes tipos:
+
+- **Additional date/time types**: Duration, ZoneId, ZoneOffset, Year, and even ZonedDateTime
+
+- **JDBC LOB types**: Blob, Clob, NClob
+
+- **Java class object**: Class
+
+- **Miscellaneous types**: Currency, URL, TimeZone
+
+Estos tipos básicos se mapean **automáticamente** a tipos de columna SQL correspondientes y pueden ser utilizados directamente en las entidades JPA sin necesidad de definiciones adicionales.
+
+La anotación `@Basic` especifica explícitamente que un atributo es básico, pero a menudo no es necesaria, ya que se asume que los atributos son básicos por defecto. Por otro lado, si un atributo de tipo no primitivo no puede ser nulo, se recomienda encarecidamente el uso de `@Basic(optional=false)`:
+
+```java
+@Basic(optional=false) String firstName;
+@Basic(optional=false) String lastName;
+String middleName; // may be null
+```
+
+Los atributos de tipo primitivo se infieren como 'NO NULL' de forma predeterminada.
 
 ---
 
-## Enlaces de interés
+## Referencias
 
 - 🔸 <https://hibernate.org>
 - <https://hibernate.org/orm/documentation/6.5>
