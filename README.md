@@ -683,13 +683,173 @@ La anotación `@Basic` especifica explícitamente que un atributo es básico, pe
 String middleName; // may be null
 ```
 
-Los atributos de tipo primitivo se infieren como 'NO NULL' de forma predeterminada.
+Los atributos de tipo primitivo se infieren como 'NOT NULL' de forma predeterminada.
+
+Hay dos formas estándar de agregar una restricción 'NOT NULL' a una columna asignada en JPA:
+
+- **usando `@Basic(optional=false)`**
+
+- **usando `@Column(nullable=false)`**
+
+La diferencia radica que mientras anotaciones como `@Entity`, `@Id`, and `@Basic` pertenecen al dominio del modelo de Java, anotaciones como `@Table` y `@Column` pertenecen a la capa del mapeo y al dominio de la base de datos relacional.
+
+Sin embargo, hay una solución mejor y es utilizar la anotación `@NotNull` de **Bean Validation**. Simplemente hay que agregar **Hibernate Validator** a la compilación del proyecto, como se describe en [dependencias opcionales](#optional-dependencies).
+
+### [Enumerated types](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#enums)
+
+Un tipo enumerado se considera un tipo básico, pero dado que la mayoría de las bases de datos no tienen un tipo _"ENUM"_ nativo, JPA proporciona una anotación especial `@Enumerated` para especificar cómo deben representarse los valores enumerados en la base de datos:
+
+- De forma predeterminada, un enumerado se almacena como un entero, el valor de su miembro `ordinal()`, pero
+
+- Pero si el atributo está anotado con `@Enumerated(STRING)`, se almacenará como una cadena, utilizando el valor de su miembro `name()`.
+
+```java
+// here, an ORDINAL encoding makes sense
+@Enumerated
+@Basic(optional=false)
+DayOfWeek dayOfWeek;
+
+// but usually, a STRING encoding is better
+@Enumerated(EnumType.STRING)
+@Basic(optional=false)
+Status status;
+```
+
+En Hibernate 6, un tipo enumerado anotado como `@Enumerated(EnumType.STRING)` se mapea como un _"VARCHAR"_ en la mayoría de bases de datos, mientras que se mapea como _"ENUM"_ en MySQL.
+
+### [Converters](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#converters)
+
+En Hibernate, los conversores son utilizados para **transformar datos de un tipo a otro** antes de ser almacenados en la base de datos y después de ser recuperados de la misma.
+
+Estas conversiones son útiles cuando se necesita adaptar tipos de datos que no son nativamente soportados por la base de datos o cuando se desea personalizar la forma en que los datos son representados o interpretados en el modelo de la base de datos.
+
+Un convertidor de atributos en JPA es responsable de:
+
+- Convertir un tipo de dato Java dado a uno de los tipos mencionados anteriormente.
+
+- Realizar cualquier otro tipo de preprocesamiento y postprocesamiento necesario en los valores de atributos básicos antes de escribirlos o leerlos desde la base de datos.
+
+Hay dos formas de aplicar un convertidor:
+
+- la anotación `@Convert` aplica un _"AttributeConverter"_ a un atributo de entidad particular, o
+
+- la anotación `@Converter` (o, alternativamente, la anotación `@ConverterRegistration`) registra un "_AttributeConverter_" para su aplicación automática a todos los atributos de un tipo determinado.
+
+### [Compositional basic types](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#compositional-basic-types)
+
+En Hibernate, un "tipo básico" se forma mediante la unión de dos objetos:
+
+- **JavaType**: representa la semántica de una clase Java específica. Puede comparar instancias de la clase para determinar si un atributo de ese tipo está modificado, generar un código hash útil para la instancia y convertir valores a otros tipos.
+
+- **JdbcType**: representa un tipo SQL entendido por JDBC. Es capaz de leer y escribir un tipo Java único desde y hacia JDBC, utilizando métodos como `setString()` y `getString()` para operaciones de escritura y lectura respectivamente.
+
+Cuando mapeamos un atributo básico, podemos especificar explícitamente un _"JavaType"_, un _"JdbcType"_, o ambos. Sin embargo, para los tipos de Java integrados esto generalmente no es necesario:
+
+```java
+@JavaType(LongJavaType.class)  // not needed, this is the default JavaType for long
+long currentTimeMillis;
+```
+
+Si un _"JavaType"_ dado no sabe cómo convertir sus instancias al tipo requerido por su _"JdbcType"_ asociado, se puede proporcionar un _"
+
+En resumen, Hibernate utiliza JavaType y JdbcType para manejar la conversión entre tipos de datos Java y tipos SQL, permitiendo configuraciones personalizadas mediante anotaciones y convertidores de atributos cuando es necesario.
+
+### [Embeddable objects](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#embeddable-objects)
+
+Un objeto embebido es una clase Java cuyo estado se mapea a múltiples columnas de una tabla, pero que no tiene su propia identidad persistente. Es decir, es una clase con atributos mapeados, pero sin un atributo `@Id`.
+
+Un objeto embebido solo puede hacerse persistente asignándolo al atributo de una entidad. Dado que el objeto embebido no tiene su propia identidad persistente, su ciclo de vida con respecto a la persistencia está completamente determinado por el ciclo de vida de la entidad a la que pertenece.
+
+Una clase embebida debe tener la anotación `@Embeddable` en lugar de `@Entity`:
+
+```java
+@Embeddable
+class Name {
+
+    @Basic(optional=false)
+    String firstName;
+
+    @Basic(optional=false)
+    String lastName;
+
+    String middleName;
+
+    Name() {}
+
+    Name(String firstName, String middleName, String lastName) {
+        this.firstName = firstName;
+        this.middleName = middleName;
+        this.lastName = lastName;
+    }
+
+    ...
+}
+```
+
+Una clase embebida debe cumplir los mismos requisitos que las clases de entidad, con la excepción de que una clase embebida no tiene el atributo `@Id`. En particular, **debe tener un constructor sin parámetros**.
+
+Alternativamente, se puede definir un tipo embebido como un tipo _"record"_ de Java 14:
+
+```java
+record Name(String firstName, String middleName, String lastName) {}
+```
+
+Siguiendo con el ejemplo , ahora se puede usar la clase _"Name"_ (o _"record"_) como el tipo de atributo de otra entidad:
+
+```java
+@Entity
+class Author {
+    @Id @GeneratedValue
+    Long id;
+
+    @Embedded
+    Name name;
+
+    ...
+}
+```
+
+JPA proporciona una anotación `@Embedded` para identificar un atributo de una entidad que hace referencia a un tipo integrable. Esta anotación es completamente **opcional**.
+
+### [Associations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#associations)
+
+Una **asociación** es una relación entre entidades. Normalmente clasificamos las asociaciones en función de su multiplicidad. Si E y F son ambas clases de entidad, entonces:
+
+- una **asociación uno a uno** relaciona como máximo una instancia única E con como máximo una instancia única de F,
+
+- una **asociación de muchos a uno** relaciona cero o más instancias de E con una instancia única de F, y
+
+- una **asociación de muchos a muchos** relaciona cero o más instancias de E con cero o más instancias de F.
+
+Una asociación entre clases de entidades puede ser:
+
+- **unidireccional**, navegable de E a F pero no de F a E, o
+
+- **bidireccional** y navegable en cualquier dirección.
+
+Hay tres anotaciones para mapear asociaciones: `@ManyToOne`, `@OneToMany` y `@ManyToMany`.
+
+#### [Many-to-one](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#many-to-one)
+
+TODO
+
+#### [One-to-one (first way)](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#one-to-one-fk)
+
+TODO
+
+#### [One-to-one (second way)](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#one-to-one-pk)
+
+TODO
+
+#### [Many-to-many](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#many-to-many)
+
+TODO
 
 ---
 
 ## Referencias
 
-- 🔸 <https://hibernate.org>
+- <https://hibernate.org>
 - <https://hibernate.org/orm/documentation/6.5>
 - <https://hibernate.org/orm/documentation/getting-started>
 - <https://www.baeldung.com/tag/hibernate>
