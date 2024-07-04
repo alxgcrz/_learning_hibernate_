@@ -831,7 +831,80 @@ Hay tres anotaciones para mapear asociaciones: `@ManyToOne`, `@OneToMany` y `@Ma
 
 #### [Many-to-one](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#many-to-one)
 
-TODO
+Una asociación de muchos a uno o _"many-to-one"_ es el tipo de asociación más básica que podemos imaginar. Se asigna de forma completamente natural a una clave externa en la base de datos. Casi todas las asociaciones en su modelo de dominio serán de esta forma.
+
+La anotación `@ManyToOne` marca el lado "a uno" de la asociación, por lo que una asociación unidireccional de muchos a uno se ve así:
+
+```java
+class Book {
+    @Id @GeneratedValue
+    Long id;
+
+    @ManyToOne(fetch=LAZY)
+    Publisher publisher;
+
+    // ...
+}
+```
+
+Aquí, la tabla 'BOOK' tiene una columna de clave externa que contiene el identificador del editor asociado.
+
+Un defecto muy desafortunado de JPA es que las asociaciones `@ManyToOne` son de tipo `(fetch=EAGER)` de forma predeterminada y salvo casos excepcionales no es lo recomendable.
+
+La carga diferida o _"Lazy Loading"_ es una estrategia de Hibernate para **retrasar la carga** de datos hasta que se necesiten. En el contexto de asociaciones _"many-to-one"_, esto significa que las entidades relacionadas no se cargan de inmediato cuando se carga la entidad principal, sino que se cargan solo cuando se accede a ellas por primera vez mejorando el rendimiento de la aplicación al reducir la cantidad de datos cargados en la memoria.
+
+```java
+@Entity
+public class Order {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
+
+    // otros campos, getters y setters
+}
+
+@Entity
+public class Customer {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Order> orders = new HashSet<>();
+
+
+    // otros campos, getters y setters
+}
+```
+
+Cuando se recupera una instancia de "ORDER" desde la base de datos, Hibernate no carga inmediatamente la entidad "CUSTOMER". En lugar de eso, crea un **proxy** para "CUSTOMER". El proxy es un objeto que actúa como un sustituto y solo carga la entidad real cuando se accede a uno de sus métodos o propiedades.
+
+```java
+public void example() {
+    // Supongamos que tenemos una instancia de EntityManager llamada em
+    Order order = em.find(Order.class, 1L);
+    
+    // En este punto, el Customer aún no ha sido cargado desde la base de datos
+    System.out.println(order.getId()); // Esto no desencadena la carga del Customer
+    
+    // Acceder a una propiedad del Customer desencadena la carga del Customer
+    System.out.println(order.getCustomer().getName()); // Aquí se carga el Customer desde la BDD
+}
+```
+
+La mayoría de las veces, nos gustaría poder navegar fácilmente por nuestras asociaciones en ambas direcciones. Necesitamos una forma de obtener el "CUSTOMER" de un "ORDER" determinado, pero también nos gustaría poder obtener todos los "ORDER" realizados por un "CUSTOMER" determinado.
+
+Para que esta asociación sea bidireccional, debemos agregar un atributo con valor de colección a la clase "CUSTOMER" y anotarlo `@OneToMany`.
+
+Hibernate necesita representar asociaciones no recuperadas en tiempo de ejecución. Por lo tanto, el lado de muchos valores debe declararse usando un tipo de interfaz como `Set` o `List`, y nunca usando un tipo concreto como `HashSet` o `ArrayList`.
+
+Una asociación de _"one-to-many"_ asignada a una clave externa nunca puede contener elementos duplicados, por lo que `Set` parece ser el tipo de colección Java semánticamente más correcto para usar y esa es la práctica convencional en la comunidad de Hibernate.
 
 #### [One-to-one (first way)](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#one-to-one-fk)
 
