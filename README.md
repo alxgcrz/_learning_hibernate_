@@ -1,6 +1,6 @@
 # Hibernate
 
-... DOCUMENTO EN DESARROLLO ...
+... EN DESARROLLO ...
 
 ## Introducción
 
