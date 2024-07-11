@@ -851,7 +851,7 @@ Aquí, la tabla 'BOOK' tiene una columna de clave externa que contiene el identi
 
 Un defecto muy desafortunado de JPA es que las asociaciones `@ManyToOne` son de tipo `(fetch=EAGER)` de forma predeterminada y salvo casos excepcionales no es lo recomendable.
 
-La carga diferida o _"Lazy Loading"_ es una estrategia de Hibernate para **retrasar la carga** de datos hasta que se necesiten. En el contexto de asociaciones _"many-to-one"_, esto significa que las entidades relacionadas no se cargan de inmediato cuando se carga la entidad principal, sino que se cargan solo cuando se accede a ellas por primera vez mejorando el rendimiento de la aplicación al reducir la cantidad de datos cargados en la memoria.
+La **carga diferida** o _"Lazy Loading"_ es una estrategia de Hibernate para **retrasar la carga** de datos hasta que se necesiten. En el contexto de asociaciones _"many-to-one"_, esto significa que las entidades relacionadas no se cargan de inmediato cuando se carga la entidad principal, sino que se cargan solo **cuando se accede a ellas por primera vez** mejorando el rendimiento de la aplicación al reducir la cantidad de datos cargados en la memoria.
 
 ```java
 @Entity
@@ -908,13 +908,274 @@ Una asociación de _"one-to-many"_ asignada a una clave externa nunca puede cont
 
 #### [One-to-one (first way)](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#one-to-one-fk)
 
-TODO
+En una relación `@OneToOne`, cada instancia de una entidad está asociada con exactamente una instancia de otra entidad. Es el tipo más simple de asociación.
+
+La principal diferencia con una asociación `@ManyToOne` es que la columna de clave externa en la tabla también tiene una restricción _UNIQUE_, garantizando que cada valor en la columna sea único y, por lo tanto, manteniendo la relación uno a uno.
+
+Una asociación uno a uno debe anotarse `@OneToOne`:
+
+```java
+@Entity
+class Author {
+    @Id @GeneratedValue
+    Long id;
+
+    @OneToOne(optional=false, fetch=LAZY)
+    Person author;
+
+    // ...
+}
+```
+
+Aquí, la tabla _"Author"_ tiene una columna de clave externa que contiene el identificador de la _"Person"_ asociada.
+
+Podemos hacer que esta asociación sea bidireccional agregando una referencia al _"Author"_ en la entidad _"Person"_:
+
+```java
+@Entity
+class Person {
+    @Id @GeneratedValue
+    Long id;
+
+    @OneToOne(mappedBy = "Author_.PERSON")
+    Author author;
+
+    // ...
+}
+```
+
+La entidad que no tiene el atributo `mappedBy` es la **propietaria de la relación**. El atributo `mappedBy` se usa para indicar que la relación está gestionada por el campo de la otra entidad.
 
 #### [One-to-one (second way)](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#one-to-one-pk)
 
-TODO
+Podría decirse que una forma más elegante de representar dicha relación es **compartir una clave principal entre las dos tablas**.
+
+Para utilizar este enfoque, la clase Autor debe anotarse así:
+
+```java
+@Entity
+class Author {
+    @Id
+    Long id;
+
+    @OneToOne(optional=false, fetch=LAZY)
+    @MapsId
+    Person author;
+
+    // ...
+}
+```
+
+En comparación con el mapeo anterior:
+
+- el atributo `@Id` ya no es `@GeneratedValue` y,
+
+- en cambio, la asociación con `Person` se anota como `@MapsId`.
+
+Esto le permite a Hibernate saber que la asociación con `Person` es la fuente de los valores de clave principal para `Author`.
+
+Aquí, no hay una columna de clave externa adicional en la tabla `Author`, ya que la columna _"id"_ contiene el identificador de `Person`. Es decir, la clave principal de la tabla `Author` cumple una doble función como clave externa que se refiere a la tabla `Person`.
 
 #### [Many-to-many](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#many-to-many)
+
+Una asociación unidireccional de muchos a muchos se representa como un atributo con valor de colección. Siempre se asigna a una tabla de asociación separada en la base de datos (una _"join table"_ que contiene las claves foráneas de ambas entidades).
+
+Suele suceder que una asociación de muchos a muchos eventualmente resulte ser una entidad disfrazada.
+
+Se recomienda evitar el uso de `@ManyToMany` desde el principio y, en su lugar, usar una entidad intermedia para representar asociaciones muchos-a-muchos. Esto es porque, a medida que evolucionan los requisitos, puede ser necesario agregar información adicional a la asociación (por ejemplo, el porcentaje de contribución de un autor a un libro). Crear una entidad intermedia desde el inicio (como _"BookAuthorship"_ que tendría asociaciones `@OneToMany` con _"Author"_ y _"Book"_, y el atributo de contribución) ofrece mayor flexibilidad, facilita el mantenimiento y la escalabilidad del sistema.
+
+Una asociación de muchos a muchos debe anotarse `@ManyToMany`:
+
+```java
+@Entity
+class Book {
+    @Id @GeneratedValue
+    Long id;
+
+    @ManyToMany
+    Set<Author> authors;
+
+    // ...
+}
+```
+
+Si la asociación es **bidireccional**, agregamos un atributo de apariencia muy similar a _"Book"_, pero esta vez debemos especificar `mappedBy` para indicar que este es el lado sin propietario de la asociación:
+
+```java
+@Entity
+class Book {
+    @Id @GeneratedValue
+    Long id;
+
+    @ManyToMany(mappedBy=Author_.BOOKS)
+    Set<Author> authors;
+
+    // ...
+}
+```
+
+Nuevamente se ha utilizado el tipo `Set` para representar la asociación. Como antes, se puede utilizar la opción de usar `Collection` o `List`. Pero en este caso sí hay una diferencia en la semántica de la asociación.
+
+Una asociación de muchos a muchos representada como `Collection` o `List` puede contener **elementos duplicados**. Sin embargo, como antes, el orden de los elementos no es persistente. Es decir, la colección es un bolso, no un conjunto.
+
+### [Collections of basic values and embeddable objects](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#collections)
+
+Las entidades en Java pueden tener colecciones de tipos básicos, como listas de cadenas (`List<String>`) o arrays de enteros (`int[]`). Hibernate y JPA proporcionan anotaciones como `@Array` y `@ElementCollection` para mapear estas colecciones a la base de datos.
+
+Sin embargo, aunque `@Array` y `@ElementCollection` pueden ser útiles en casos específicos, su uso se desaconseja generalmente por las siguientes razones:
+
+- **Complejidad**: las colecciones de elementos básicos pueden complicar el diseño y mantenimiento del esquema de la base de datos.
+
+- **Limitaciones**: algunas bases de datos no soportan el tipo _"ARRAY"_.
+
+- **Buenas prácticas**: las relaciones muchos-a-muchos o uno-a-muchos suelen gestionarse mejor mediante asociaciones de clave foránea entre entidades.
+
+Por tanto, el enfoque recomendado es modelar la colección usando **entidades separadas** y definir una **relación** entre la entidad principal y la nueva entidad.
+
+Por ejemplo, supongamos que se requiere guardar una lista de palabras clave para cada libro. Para ello, primeramente podemos crear una entidad _"Keyword"_ para el elemento básico:
+
+```java
+@Entity
+public class Keyword {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String value;
+
+    @ManyToOne
+    @JoinColumn(name = "book_id")
+    private Book book;
+
+    // getters y setters
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Keyword)) return false;
+        Keyword keyword = (Keyword) o;
+        return Objects.equals(getValue(), keyword.getValue()) &&
+               Objects.equals(getBook(), keyword.getBook());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getValue(), getBook());
+    }
+}
+```
+
+Luego podemos definir la relación con la entidad principal, que es  _"Book"_:
+
+```java
+@Entity
+public class Book {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String title;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Keyword> keywords = new ArrayList<>();
+
+    // getters y setters
+
+    public void addKeyword(String keywordValue) {
+        Keyword keyword = new Keyword();
+        keyword.setValue(keywordValue);
+        keyword.setBook(this);
+        keywords.add(keyword);
+    }
+
+    public void removeKeyword(Keyword keyword) {
+        keywords.remove(keyword);
+        keyword.setBook(null);
+    }
+}
+```
+
+Este enfoque tiene ciertas ventajas:
+
+- **Flexibilidad**: permite agregar metadatos adicionales a cada elemento de la colección, es decir, podemos ampliar _"Keyword"_ sin que el modelo se vea comprometido.
+
+- **Mantenibilidad**: facilita el mantenimiento y la evolución del esquema de la base de datos.
+
+- **Consistencia**: alineado con las prácticas estándar de diseño de bases de datos relacionales.
+
+### [Collections mapped to SQL arrays](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#arrays)
+
+La anotación `@Array` permite mapear una colección de elementos básicos a una columna de tipo _"ARRAY"_ en SQL (si la base de datos lo soporta).
+
+```java
+@Entity
+class Event {
+    @Id @GeneratedValue
+    Long id;
+    ...
+    @Array(length=7)
+    DayOfWeek[] daysOfWeek;  // stored as a SQL ARRAY type
+    
+    // ...
+}
+```
+
+Sin embargo, como se ha comentado, no es el enfoque recomendado. En la documentación oficial se amplían los motivos.
+
+### [Collections mapped to a separate table](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#element-collections)
+
+JPA define una forma estándar de asignar una colección a una tabla auxiliar y es la anotación `@ElementCollection`. Esta anotación permite mapear una colección de elementos básicos o embebidos a una tabla separada:
+
+```java
+@Entity
+class Event {
+    @Id @GeneratedValue
+    Long id;
+    ...
+    @ElementCollection
+    List<DayOfWeek> daysOfWeek;  // stored in a dedicated table
+    
+    // ...
+}
+```
+
+Sin embargo, como se ha comentado, este tampoco es el enfoque recomendado. En la documentación oficial se amplían los motivos.
+
+### [Summary of annotations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities-summary)
+
+Lista de las anotaciones vistas y si existe equivalencia con JPA.
+
+### [equals() and hashCode()](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#equals-and-hash)
+
+Las clases de entidad deberían sobrescribir `equals()` y `hashCode()`, especialmente cuando las asociaciones se representan como conjuntos (`Set`) y/o variaciones como `HashSet` o `HashMap` ya que estos métodos son esenciales para determinar si dos objetos son iguales y para calcular sus valores hash tanto en Java como Hibernate.
+
+Hay que tener en cuenta que no se debe incluir un campo mutable en `hashCode()`, ya que modificarlo cambiaría su valor hash y podría causar problemas de inconsistencia en las colecciones basadas en `Set`.
+
+Además, aunque técnicamente no está mal incluir un identificador generado por la base de datos en `hashCode()` es arriesgado hacerlo antes de que el identificador sea generado (es decir, antes de que la entidad sea persistida en la base de datos). Esto se debe a que el valor del identificador podría cambiar y afectar la integridad de la colección.
+
+```java
+@Entity
+public class Keyword {
+   
+    // ...
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Keyword)) return false;
+        Keyword keyword = (Keyword) o;
+        return Objects.equals(getValue(), keyword.getValue()) &&
+               Objects.equals(getBook(), keyword.getBook());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getValue(), getBook());
+    }
+}
+```
+
+## [Object/relational mapping](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#object-relational-mapping)
 
 TODO
 
