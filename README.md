@@ -1141,10 +1141,6 @@ class Event {
 
 Sin embargo, como se ha comentado, este tampoco es el enfoque recomendado. En la documentación oficial se amplían los motivos.
 
-### [Summary of annotations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities-summary)
-
-Lista de las anotaciones vistas y si existe equivalencia con JPA.
-
 ### [equals() and hashCode()](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#equals-and-hash)
 
 Las clases de entidad deberían sobrescribir `equals()` y `hashCode()`, especialmente cuando las asociaciones se representan como conjuntos (`Set`) y/o variaciones como `HashSet` o `HashMap` ya que estos métodos son esenciales para determinar si dos objetos son iguales y para calcular sus valores hash tanto en Java como Hibernate.
@@ -1208,6 +1204,115 @@ class Author { ... }
 
 ### [Mapping to tables](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#table-mappings)
 
+Las siguientes anotaciones especifican exactamente cómo se asignan los elementos del modelo de dominio a las tablas del modelo relacional:
+
+- **`@Table`**: asignar una clase de entidad a su tabla principal.
+
+- **`@SecondaryTable`**: definir una tabla secundaria para una clase de entidad.
+
+- **`@Table`**: asignar una asociación de muchos a muchos o de muchos a uno a su tabla de asociaciones.
+
+- **`@Table`**: asignar un `@ElementCollection` a su tabla.
+
+### [Mapping entities to tables](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entity-table-mappings)
+
+De forma predeterminada, una entidad se asigna a una sola tabla, que se puede especificar usando `@Table`:
+
+```java
+@Entity
+@Table(name="People")
+class Person { 
+    // ... 
+}
+```
+
+Sin embargo, la anotación `@SecondaryTable` nos permite distribuir sus atributos en varias tablas secundarias:
+
+```java
+@Entity
+@Table(name="Books")
+@SecondaryTable(name="Editions")
+class Book { 
+    // ... 
+}
+```
+
+La anotación [`@Table`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/table) tiene argumentos como _"name"_, etcétera...
+
+Sin embargo, **se recomienda no utilizar los argumentos _"schema"_ y _"catalog"_**. Especificar un _"schema"_ o "_catalog_" en el código de la aplicación puede hacer que la aplicación dependa de una estructura específica de la base de datos. Es preferible manejar la configuración del esquema o catálogo a nivel de la configuración de Hibernate (por ejemplo, en el archivo de propiedades) o en la propia URL JDBC de conexión.
+
+La anotación [`@SecondaryTable`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/secondarytable) también tiene argumentos como _"name"_, etcétera...
+
+En este caso también **se recomienda NO utilizar los argumentos _"schema"_ y _"catalog"_**.
+
+### [Mapping associations to tables](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#join-table-mappings)
+
+La anotación [`@JoinTable`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/jointable) especifica una tabla de asociación, es decir, una tabla que contiene las claves externas de ambas entidades asociadas. Esta anotación se utiliza normalmente con asociaciones `@ManyToMany`:
+
+```java
+@Entity
+class Book {
+    ...
+
+    @ManyToMany
+    @JoinTable(name="BooksAuthors")
+    Set<Author> authors;
+
+    // ...
+}
+```
+
+Pero incluso es posible usarlo para asignar una asociación `@ManyToOne` o `@OneToOne` a una tabla de asociaciones:
+
+```java
+@Entity
+class Book {
+    ...
+
+    @ManyToOne(fetch=LAZY)
+    @JoinTable(name="BookPublisher")
+    Publisher publisher;
+
+    // ...
+}
+```
+
+#### [Mappings to columns](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#column-mappings)
+
+TODO
+
+---
+
+### [Summary of annotations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities-summary)
+
+Resumen de algunas de las anotaciones disponibles en Hibernate y JPA. El **_"Javadoc"_** de las anotaciones que forman parte del estándar de JPA estan en el paquete [`jakarta.persistance`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/package-summary) de la documentación de **Jakarta 10** (última versión estable a _07/2024_).
+
+En cambio, las anotaciones que no son del estándar y han sido añadidas por Hibernate, se encuentran en el paquete [`org.hibernate.annotations`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/package-summary.html) de la documentación de **Hibernate**:
+
+- **`@Entity`**: declarar una clase de entidad - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/entity)
+
+- **`@MappedSuperclass`**: declarar una clase que no sea una entidad con atributos mapeados heredados por una entidad - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/mappedsuperclass)
+
+- **`@Embeddable`**: declarar un tipo integrable - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/embeddable)
+
+- **`@IdClass`**: declarar la clase de identificador para una entidad con múltiples atributos `@Id` - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/idclass)
+
+- **`@Id`**: declarar un atributo de identificador de tipo básico - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/id)
+
+- **`@Version`**: declarar un atributo de versión - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/version)
+
+- **`@Basic`**: declarar un atributo básico - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/basic)
+
+- **`@EmbeddedId`**: declarar un atributo de identificador de tipo embebido - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/embeddedid)
+
+- **`@Embedded`**: declarar un atributo de tipo embebido - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/embedded)
+
+- **`@Enumerated`**: declarar un atributo de tipo enumeración y especificar cómo se codifica - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/enumerated)
+
+- **`@Array`**: declarar que un atributo se asigna a un ARRAY de SQL y especificar la longitud - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/Array.html)
+
+- **`@ElementCollection`**: declarar que una colección está asignada a una tabla dedicada - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/elementcollection)
+
 TODO
 
 ---
@@ -1217,7 +1322,9 @@ TODO
 - <https://hibernate.org>
 - <https://hibernate.org/orm/documentation/6.5>
 - <https://hibernate.org/orm/documentation/getting-started>
-- <https://www.baeldung.com/tag/hibernate>
+- <https://docs.jboss.org/hibernate/orm/6.5/javadocs/>
+- <https://jakarta.ee/specifications/platform/10/apidocs/>
+- <https://www.baeldung.com/learn-jpa-hibernate>
 
 ## Licencia
 
