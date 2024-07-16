@@ -1277,9 +1277,68 @@ class Book {
 }
 ```
 
-#### [Mappings to columns](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#column-mappings)
+### [Mappings to columns](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#column-mappings)
 
-TODO
+Estas anotaciones especifican cómo los elementos del modelo de dominio se asignan a columnas de tablas en el modelo relacional:
+
+- [`@Column`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/column): asigna un atributo a una columna
+
+- [`@JoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/joincolumn): asigna una asociación a una columna de clave externa
+
+- [`@PrimaryKeyJoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/primarykeyjoincolumn): asigna la clave principal utilizada para unir una tabla secundaria con su tabla principal o una tabla de subclase en herencia JOINED con su tabla de clase raíz.
+
+- [`@OrderColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/ordercolumn): especifica una columna que debe usarse para mantener el orden de una _"List"_.
+
+- [`@MapKeyColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/mapkeycolumn): se especificó una columna que se debe usar para conservar las claves de un _"Map"_.
+
+### [Mapping basic attributes to columns](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#regular-column-mappings)
+
+La anotación [`@Column`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/column) no solo es útil para especificar el nombre de la columna.
+
+Esta anotación acepta una serie de atributos que puede consultarse [aquí](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/column).
+
+```java
+@Entity
+@Table(name="Books")
+@SecondaryTable(name="Editions")
+class Book {
+    @Id @GeneratedValue
+    @Column(name="bookId") // customize column name
+    Long id;
+
+    @Column(length=100, nullable=false) // declare column as VARCHAR(100) NOT NULL
+    String title;
+
+    @Column(length=17, unique=true, nullable=false) // declare column as VARCHAR(17) NOT NULL UNIQUE
+    String isbn;
+
+    @Column(table="Editions", updatable=false) // column belongs to the secondary table, and is never updated
+    int edition;
+}
+```
+
+### [Mapping associations to foreign key columns](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#join-column-mappings)
+
+La anotación [`@JoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/joincolumn) se utiliza para personalizar una columna de clave externa.
+
+Esta anotación acepta una serie de atributos que puede consultarse [aquí](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/joincolumn).
+
+Una columna de clave externa no necesariamente tiene que hacer referencia a la clave principal de la tabla a la que se hace referencia. Es bastante aceptable que la clave externa haga referencia a cualquier otra clave única de la entidad a la que se hace referencia, incluso a una clave única de una tabla secundaria.
+
+```java
+@Entity
+@Table(name="Items")
+class Item {
+    // ...
+
+    @ManyToOne(optional=false)  // implies nullable=false
+    @JoinColumn(name = "bookIsbn", referencedColumnName = "isbn",  // a reference to a non-PK column
+                foreignKey = @ForeignKey(name="ItemsToBooksBySsn")) // supply a name for the FK constraint
+    Book book;
+
+    // ...
+}
+```
 
 ---
 
