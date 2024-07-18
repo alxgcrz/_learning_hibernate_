@@ -948,9 +948,9 @@ La entidad que no tiene el atributo `mappedBy` es la **propietaria de la relaci�
 
 #### [One-to-one (second way)](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#one-to-one-pk)
 
-Podría decirse que una forma más elegante de representar dicha relación es **compartir una clave principal entre las dos tablas**.
+Podría decirse que una forma más elegante de representar dicha relación es **compartir una clave primaria entre las dos tablas**.
 
-Para utilizar este enfoque, la clase Autor debe anotarse así:
+Para utilizar este enfoque, la clase _"Autor"_ debe anotarse así:
 
 ```java
 @Entity
@@ -972,9 +972,9 @@ En comparación con el mapeo anterior:
 
 - en cambio, la asociación con `Person` se anota como `@MapsId`.
 
-Esto le permite a Hibernate saber que la asociación con `Person` es la fuente de los valores de clave principal para `Author`.
+Esto le permite a Hibernate saber que la asociación con `Person` es la fuente de los valores de clave primaria para `Author`.
 
-Aquí, no hay una columna de clave externa adicional en la tabla `Author`, ya que la columna _"id"_ contiene el identificador de `Person`. Es decir, la clave principal de la tabla `Author` cumple una doble función como clave externa que se refiere a la tabla `Person`.
+Aquí, no hay una columna de clave externa adicional en la tabla `Author`, ya que la columna _"id"_ contiene el identificador de `Person`. Es decir, la clave primaria de la tabla `Author` cumple una doble función como clave externa que se refiere a la tabla `Person`.
 
 #### [Many-to-many](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#many-to-many)
 
@@ -1226,14 +1226,35 @@ class Person {
 }
 ```
 
-Sin embargo, la anotación `@SecondaryTable` nos permite distribuir sus atributos en varias tablas secundarias:
+Sin embargo, la anotación `@SecondaryTable` nos permite distribuir sus atributos en varias tablas secundarias, es decir, la anotación `@SecondaryTable` se utiliza para mapear una entidad a múltiples tablas en una base de datos. Esto es útil cuando los datos de una entidad están distribuidos en varias tablas, pero se desea manejar la entidad como una sola unidad en el código Java.
+
+Por ejemplo, supongamos que tenemos una entidad _"Employee"_ cuyos datos están distribuidos en dos tablas: _"employee(id as PK, first_name, last_name)"_ y _"employee_details(employee_id as FK, address, phone_number)"_:
 
 ```java
+@import javax.persistence.*;
+
 @Entity
-@Table(name="Books")
-@SecondaryTable(name="Editions")
-class Book { 
-    // ... 
+@Table(name = "employee")
+@SecondaryTable(name = "employee_details", pkJoinColumns = @PrimaryKeyJoinColumn(name = "employee_id"))
+public class Employee {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "first_name")
+    private String firstName;
+
+    @Column(name = "last_name")
+    private String lastName;
+
+    @Column(table = "employee_details", name = "address")
+    private String address;
+
+    @Column(table = "employee_details", name = "phone_number")
+    private String phoneNumber;
+
+    // Getters and setters
 }
 ```
 
@@ -1285,7 +1306,7 @@ Estas anotaciones especifican cómo los elementos del modelo de dominio se asign
 
 - [`@JoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/joincolumn): asigna una asociación a una columna de clave externa
 
-- [`@PrimaryKeyJoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/primarykeyjoincolumn): asigna la clave principal utilizada para unir una tabla secundaria con su tabla principal o una tabla de subclase en herencia JOINED con su tabla de clase raíz.
+- [`@PrimaryKeyJoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/primarykeyjoincolumn): asigna la clave primaria utilizada para unir una tabla secundaria con su tabla principal o una tabla de subclase en herencia JOINED con su tabla de clase raíz.
 
 - [`@OrderColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/ordercolumn): especifica una columna que debe usarse para mantener el orden de una _"List"_.
 
@@ -1323,7 +1344,7 @@ La anotación [`@JoinColumn`](https://jakarta.ee/specifications/platform/10/apid
 
 Esta anotación acepta una serie de atributos que puede consultarse [aquí](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/joincolumn).
 
-Una columna de clave externa no necesariamente tiene que hacer referencia a la clave principal de la tabla a la que se hace referencia. Es bastante aceptable que la clave externa haga referencia a cualquier otra clave única de la entidad a la que se hace referencia, incluso a una clave única de una tabla secundaria.
+Una columna de clave externa no necesariamente tiene que hacer referencia a la clave primaria de la tabla a la que se hace referencia. Es bastante aceptable que la clave externa haga referencia a cualquier otra clave única de la entidad a la que se hace referencia, incluso a una clave única de una tabla secundaria.
 
 ```java
 @Entity
@@ -1340,13 +1361,81 @@ class Item {
 }
 ```
 
+Si no proporciona un nombre explícito usando `@ForeignKey`, Hibernate generará un nombre bastante feo.
+
+### [Mapping primary key joins between tables](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#primary-key-column-mappings)
+
+La anotación [`@PrimaryKeyJoinColumn`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/primarykeyjoincolumn) es una anotación de propósito especial para mapeo:
+
+- la columna de clave primaria de `@SecondaryTable`, que también es una clave externa que hace referencia a la tabla principal,
+
+- la columna de clave primaria de la tabla principal asignada por una subclase en una jerarquía de herencia `JOINED`, que también es una clave externa que hace referencia a la tabla principal asignada por la entidad raíz.
+
+Al mapear la clave primaria de una tabla de subclase, colocamos la anotación @PrimaryKeyJoinColumn en la clase de entidad:
+
+```java
+@Entity
+@Table(name="People")
+@Inheritance(strategy=JOINED)
+class Person { ... }
+
+@Entity
+@Table(name="Authors")
+@PrimaryKeyJoinColumn(name="personId") // the primary key of the Authors table
+class Author { ... }
+```
+
+Pero para asignar una clave primaria de una tabla secundaria, la anotación `@PrimaryKeyJoinColumn` debe ocurrir dentro de la anotación `@SecondaryTable`:
+
+```java
+@Entity
+@Table(name="Books")
+@SecondaryTable(name="Editions",
+                pkJoinColumns = @PrimaryKeyJoinColumn(name="bookId")) // the primary key of the Editions table
+class Book {
+    @Id @GeneratedValue
+    @Column(name="bookId") // the name of the primary key of the Books table
+    Long id;
+
+    ...
+}
+```
+
+### [Column lengths and adaptive column types](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#column-lengths)
+
+Hibernate ajusta automáticamente el tipo de columna utilizado en el DDL generado en función de la longitud de la columna especificada por la anotación `@Column`.
+
+Por lo tanto, normalmente no necesitaremos especificar explícitamente que una columna debe ser de un tipo determinado porque Hibernate seleccionará automáticamente el tipos si es necesario para acomodar una cadena de la longitud que especifiquemos.
+
+- **DEFAULT** → 255
+
+- **LONG** → 32600
+
+- **LONG16** → 32767
+
+- **LONG32** → 2147483647
+
+```java
+@Column(length=LONG)
+String text;
+
+@Column(length=LONG32)
+byte[] binaryData;
+```
+
+### [LOBs](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#lobs)
+
+TODO
+
 ---
 
 ### [Summary of annotations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities-summary)
 
 Resumen de algunas de las anotaciones disponibles en Hibernate y JPA. El **_"Javadoc"_** de las anotaciones que forman parte del estándar de JPA estan en el paquete [`jakarta.persistance`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/package-summary) de la documentación de **Jakarta 10** (última versión estable a _07/2024_).
 
-En cambio, las anotaciones que no son del estándar y han sido añadidas por Hibernate, se encuentran en el paquete [`org.hibernate.annotations`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/package-summary.html) de la documentación de **Hibernate**:
+En cambio, las anotaciones que no son del estándar y han sido añadidas por Hibernate, se encuentran en el paquete [`org.hibernate.annotations`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/package-summary.html) de la documentación de **Hibernate**.
+
+#### Entities and embeddable types
 
 - **`@Entity`**: declarar una clase de entidad - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/entity)
 
@@ -1355,6 +1444,8 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 - **`@Embeddable`**: declarar un tipo integrable - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/embeddable)
 
 - **`@IdClass`**: declarar la clase de identificador para una entidad con múltiples atributos `@Id` - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/idclass)
+
+#### Basic and embedded attributes
 
 - **`@Id`**: declarar un atributo de identificador de tipo básico - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/id)
 
@@ -1372,7 +1463,45 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 - **`@ElementCollection`**: declarar que una colección está asignada a una tabla dedicada - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/elementcollection)
 
-TODO
+#### Converters and compositional basic types
+
+- **`@Converter`**: registra un `AttributeConverter` - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/converter)
+
+- **`@Convert`**: aplica un convertidor a un atributo - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/convert)
+
+- **`@JavaType`**: especifica explícitamente una implementación de `JavaType` para un atributo básico - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/JavaType.html)
+
+- **`@JdbcType`**: especifica explícitamente una implementación de `JdbcType` para un atributo básico - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/JdbcType.html)
+
+- **`@JdbcTypeCode`**: especifica explícitamente un código de tipo JDBC utilizado para determinar el `JdbcType` para un atributo básico. - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/JdbcTypeCode.html)
+
+- **`@JavaTypeRegistration`**: registra un `JavaType` para un tipo de Java determinado  - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/JavaTypeRegistration.html)
+
+- **`@JdbcTypeRegistration`**: registra un `JdbcType` para un código de tipo JDBC determinado - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/JdbcTypeRegistration.html)
+
+#### System-generated identifiers
+
+- **`@GeneratedValue`**: especificar que un identificador es generado por el sistema - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/generatedvalue)
+
+- **`@SequenceGenerator`**: definir una identificación generada respaldada por una secuencia de base de datos - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/sequencegenerator)
+
+- **`@TableGenerator`**: definir una identificación generada respaldada por una tabla de base de datos - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/tablegenerator)
+
+- **`@IdGeneratorType`**: declarar una anotación que asocie un `Generator` personalizado con cada atributo `@Id` que anota - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/IdGeneratorType.html)
+
+- **`@ValueGenerationType`**: declarar una anotación que asocie un `Generator` personalizado con cada atributo `@Basic` que anota - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/ValueGenerationType.html)
+
+#### Entity associations
+
+- **`@ManyToOne`**: declarar el lado de un solo valor de una asociación de muchos a uno (el lado propietario) - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/manytoone)
+
+- **`@OneToMany`**: declarar el lado multivalor de una asociación de muchos a uno (el lado sin propietario) - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/onetomany)
+
+- **`@ManyToMany`**: especifica una asociación de muchos valores con multiplicidad de muchos a muchos. - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/manytomany)
+
+- **`@OneToOne`**: declarar cualquiera de los lados de una asociación uno a uno - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/onetoone)
+
+- **`@MapsId`**: declarar que el lado propietario de una asociación @OneToOne asigna la columna de clave principal - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/mapsid)
 
 ---
 
