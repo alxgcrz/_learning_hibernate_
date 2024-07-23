@@ -1425,17 +1425,138 @@ byte[] binaryData;
 
 ### [LOBs](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#lobs)
 
+JPA proporciona una anotación `@Lob` que especifica que un campo debe persistirse como un BLOB o CLOB.
+
+Los controladores JDBC son perfectamente capaces de convertir entre `String y CLOB` o entre `byte[] y BLOB`. Por lo tanto, a menos que se necesite usar específicamente estas API de LOB de JDBC, no se necesita la anotación `@Lob`.
+
+Todo lo que necesita es especificar una longitud de columna lo suficientemente grande para acomodar los datos que planea escribir en esa columna.
+
+```java
+@Column(length=LONG32) // good, correct column type inferred
+String text;
+
+@Lob // almost always unnecessary
+String text;
+```
+
+Esto es particularmente cierto para **PostgreSQL** ya que no tiene un tipo de dato específico para BLOBs y CLOBs por lo que se pueden producir errores cuando se usa la anotación `@Lob` con **PostgreSQL**.
+
+Finalmente, como alternativa, Hibernate permite declarar un atributo de tipo `java.sql.Blob` o `java.sql.Clob`:
+
+```java
+@Entity
+class Book {
+    ...
+    Clob text;
+    Blob coverArt;
+    ....
+}
+```
+
+### [Mapping embeddable types to UDTs or to JSON](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#mapping-embeddables)
+
+Hay un par de formas alternativas de representar un tipo embebido en el lado de la base de datos.
+
+#### Embeddables as UDTs
+
+Primero, una opción realmente interesante, al menos en el caso de los tipos `record` de Java y para las bases de datos que soportan **tipos definidos por el usuario (UDTs)**, es definir un UDT que represente el tipo `record`.
+
+Solo se necesita anotar el tipo `record`, o el atributo que contiene una referencia a él, con la nueva anotación `@Struct`:
+
+```java
+@Embeddable
+@Struct(name="PersonName")
+record Name(String firstName, String middleName, String lastName) {}
+```
+
+```java
+@Entity
+class Person {
+    // ...
+    Name name;
+    // ...
+}
+```
+
+Lo que resulta en el siguiente UDT:
+
+```sql
+create type PersonName as (firstName varchar(255), middleName varchar(255), lastName varchar(255))
+```
+
+#### Embeddables to JSON
+
+Una segunda opción disponible es mapear el tipo embebible a una columna JSON. Ahora bien, esto no es algo que recomendable si se está definiendo un modelo de datos desde cero, pero es al menos útil para mapear tablas preexistentes con columnas de tipo JSON. Dado que los tipos embebibles son anidables, podemos mapear algunos formatos JSON de esta manera, e incluso consultar propiedades JSON usando HQL.
+
+Para mapear un atributo de tipo embebible a JSON, debemos anotar el atributo con `@JdbcTypeCode(SqlTypes.JSON)`, en lugar de anotar el tipo embebible.
+
+```java
+@Embeddable
+record Name(String firstName, String middleName, String lastName) {}
+```
+
+```java
+@Entity
+class Person {
+    // ...
+    @JdbcTypeCode(SqlTypes.JSON)
+    Name name;
+    // ...
+}
+```
+
+También se necesita agregar **Jackson** o una implementación de JSONB al classpath en tiempo de ejecución.
+
+### [Adding constraints](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#constraints)
+
+Hibernate añade ciertas _constraints_ a la DDL generada automáticamente: restricciones de clave primaria, restricciones de clave foránea y algunas restricciones únicas. Pero es común necesitar:
+
+- **Agregar restricciones únicas adicionales,**
+
+- **Agregar restricciones de verificación (check constraints), o**
+
+- **Personalizar el nombre de una restricción de clave foránea.**
+
+Hay dos formas de agregar una restricción única a una tabla:
+
+- usando `@Column(unique=true)` para indicar una clave única de una sola columna, o
+
+- usando la anotación `@UniqueConstraint` para definir una restricción de unicidad en una combinación de columnas.
+
+```java
+@Entity
+@Table(uniqueConstraints=@UniqueConstraint(columnNames={"title", "year", "publisher_id"}))
+class Book { ... }
+```
+
+La anotación `@Check` agrega una restricción de verificación a la tabla.
+
+```java
+@Entity
+@Check(name="ValidISBN", constraints="length(isbn)=13")
+class Book { ... }
+```
+
+La anotación `@Check` se usa comúnmente a nivel de campo:
+
+```java
+@Id @Check(constraints="length(isbn)=13")
+String isbn;
+```
+
+## [Interacting with the database](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#interacting)
+
 TODO
 
 ---
 
-### [Summary of annotations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities-summary)
+## [Summary of annotations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities-summary)
 
 Resumen de algunas de las anotaciones disponibles en Hibernate y JPA. El **_"Javadoc"_** de las anotaciones que forman parte del estándar de JPA estan en el paquete [`jakarta.persistance`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/package-summary) de la documentación de **Jakarta 10** (última versión estable a _07/2024_).
 
 En cambio, las anotaciones que no son del estándar y han sido añadidas por Hibernate, se encuentran en el paquete [`org.hibernate.annotations`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/package-summary.html) de la documentación de **Hibernate**.
 
-#### Entities and embeddable types
+### Entities and embeddable types
 
 - **`@Entity`**: declarar una clase de entidad - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/entity)
 
@@ -1445,7 +1566,7 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 - **`@IdClass`**: declarar la clase de identificador para una entidad con múltiples atributos `@Id` - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/idclass)
 
-#### Basic and embedded attributes
+### Basic and embedded attributes
 
 - **`@Id`**: declarar un atributo de identificador de tipo básico - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/id)
 
@@ -1463,7 +1584,7 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 - **`@ElementCollection`**: declarar que una colección está asignada a una tabla dedicada - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/elementcollection)
 
-#### Converters and compositional basic types
+### Converters and compositional basic types
 
 - **`@Converter`**: registra un `AttributeConverter` - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/converter)
 
@@ -1479,7 +1600,7 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 - **`@JdbcTypeRegistration`**: registra un `JdbcType` para un código de tipo JDBC determinado - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/JdbcTypeRegistration.html)
 
-#### System-generated identifiers
+### System-generated identifiers
 
 - **`@GeneratedValue`**: especificar que un identificador es generado por el sistema - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/generatedvalue)
 
@@ -1491,7 +1612,7 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 - **`@ValueGenerationType`**: declarar una anotación que asocie un `Generator` personalizado con cada atributo `@Basic` que anota - [Hibernate](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/annotations/ValueGenerationType.html)
 
-#### Entity associations
+### Entity associations
 
 - **`@ManyToOne`**: declarar el lado de un solo valor de una asociación de muchos a uno (el lado propietario) - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/manytoone)
 
@@ -1502,6 +1623,28 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 - **`@OneToOne`**: declarar cualquiera de los lados de una asociación uno a uno - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/onetoone)
 
 - **`@MapsId`**: declarar que el lado propietario de una asociación @OneToOne asigna la columna de clave principal - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/mapsid)
+
+### Annotations for mapping tables
+
+- **`@Table`**: asigna una clase de entidad a su tabla principal - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/table)
+
+- **`@SecondaryTable`**: define una tabla secundaria para una clase de entidad - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/secondarytable)
+
+- **`@JoinTable`**: asigna una asociación de _many-to-many_ o de _many-to-one_ a su tabla de asociaciones - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/jointable)
+
+- **`@CollectionTable`**: asigna un @ElementCollection a su tabla - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/collectiontable)
+
+### Annotations for mapping columns
+
+- **`@Column`**: asigna un atributo a una columna - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/column)
+
+- **`@JoinColumn`**: asigna una asociación a una columna de clave externa - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/joincolumn)
+
+- **`@PrimaryKeyJoinColumn`**: asigna la clave principal utilizada para unir una tabla secundaria con su tabla principal o una tabla de subclase en herencia JOINED con su tabla de clase raíz. - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/primarykeyjoincolumn)
+
+- **`@OrderColumn`**: especifica una columna que debe usarse para mantener el orden de una List. - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/ordercolumn)
+
+- **`@MapKeyColumn`**: especifica una columna que se debe usar para conservar las claves de un Map. - [Estándar JPA](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/mapkeycolumn)
 
 ---
 
