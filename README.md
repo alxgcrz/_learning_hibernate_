@@ -1546,6 +1546,68 @@ String isbn;
 
 ## [Interacting with the database](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#interacting)
 
+Para interactuar con la base de datos, es decir, para ejecutar consultas o para insertar, actualizar o eliminar datos, se necesita una instancia de uno de los siguientes objetos:
+
+- [**EntityManager de JPA**](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/entitymanager)
+
+- [**Session de Hibernate**](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/Session.html)
+
+- [**StatelessSession de Hibernate**](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/StatelessSession.html)
+
+La interfaz `Session` extiende `EntityManager`, por lo que la única diferencia entre las dos interfaces es que `Session` ofrece algunas operaciones adicionales.
+
+En Hibernate, cada `EntityManager` es una `Session`, y puede convertirse utilizando el método `unwrap()` de JPA para obtener la implementación subyacente de JPA:
+
+```java
+Session session = entityManager.unwrap(Session.class);
+```
+
+Una instancia de `Session` (o de `EntityManager`) es una **sesión con estado**. Esta sesión media la interacción entre la aplicación y la base de datos a través de operaciones en un contexto de persistencia.
+
+La sesión con estado realiza un seguimiento de las entidades y sus estados (nuevo, persistente, separado, eliminado) a lo largo de la transacción.
+
+El **contexto de persistencia** es una memoria intermedia que almacena temporalmente las entidades mientras se realizan operaciones de base de datos, lo que permite optimizar el rendimiento mediante el almacenamiento en caché de primer nivel y la agrupación de operaciones.
+
+La interfaz `StatelessSession` no tiene un contexto de persistencia.
+
+### [Persistence Contexts](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#persistence-contexts)
+
+El **contexto de persistencia** es un concepto fundamental en Hibernate y JPA que gestiona las entidades que están en un ciclo de vida de persistencia dentro de una sesión.
+
+Actúa como una especie de **"caché de primer nivel"**, para distinguirla de la [caché de segundo nivel](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#second-level-cache). Para cada instancia de entidad leída desde la base de datos dentro del ámbito de un contexto de persistencia, y para cada nueva entidad hecha persistente dentro del ámbito del contexto de persistencia, el contexto mantiene una asignación única del identificador de la instancia de entidad a la instancia en sí.
+
+Una instancia de entidad puede estar en uno de tres estados con respecto a un contexto de persistencia dado:
+
+- **Transitorio (Transient)**: nunca ha sido persistente y no está asociada con el contexto de persistencia. Estas entidades son nuevas y no han sido guardadas en la base de datos.
+
+- **Persistente (Persistent)**: actualmente asociada con el contexto de persistencia. Cualquier cambio realizado en una entidad persistente se sincronizará automáticamente con la base de datos al final de la transacción o cuando se invoque `flush()`.
+
+- **Separado (Detached)**: anteriormente persistente en otra sesión, pero no actualmente asociada con este contexto de persistencia. Pueden ser reconectadas a un nuevo contexto de persistencia si es necesario.
+
+En cualquier momento dado, **una instancia puede estar asociada como máximo a un contexto de persistencia**.
+
+La duración de un contexto de persistencia generalmente corresponde a la duración de una transacción. Una vez que la transacción se completa, el contexto de persistencia se cierra y todas las entidades gestionadas por él se vuelven separadas (detached).
+
+Un contexto de persistencia no debe ser compartido entre múltiples hilos o transacciones concurrentes debido a problemas de concurrencia y seguridad de subprocesos.
+
+Hay diversas razones para valorar los contextos de persistencia:
+
+- Los contextos de persistencia ayudan a **evitar la duplicidad de datos**. Si modificamos una entidad en una sección del código, cualquier otra parte del código que se ejecute dentro del mismo contexto de persistencia verá nuestra modificación.
+
+- Después de modificar una entidad, no es necesario realizar ninguna operación explícita para pedir a Hibernate que propague ese cambio a la base de datos. En su lugar, el cambio se sincronizará automáticamente con la base de datos cuando **la sesión se vacíe** _('flush')_.
+
+- Los contextos de persistencia pueden mejorar el rendimiento evitando viajes a la base de datos cuando se solicita repetidamente una instancia de entidad en una unidad de trabajo dada.
+
+- Hacen posible agrupar de manera transparente múltiples operaciones de base de datos, lo cual puede optimizar el rendimiento.
+
+Sin embargo, un contexto de persistencia también tiene ciertas restricciones:
+
+- Los contextos de persistencia no son seguros para subprocesos y no pueden ser compartidos entre subprocesos. Compartir un contexto de persistencia entre múltiples subprocesos puede llevar a corrupción de datos y problemas de concurrencia.
+
+- Un contexto de persistencia no puede ser reutilizado en transacciones no relacionadas, ya que eso rompería la aislación y atomicidad de las transacciones. Cada transacción debe tener su propio contexto de persistencia para garantizar la coherencia de los datos.
+
+### [Creating a session](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#creating-session)
+
 TODO
 
 ---
