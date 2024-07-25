@@ -1608,6 +1608,227 @@ Sin embargo, un contexto de persistencia también tiene ciertas restricciones:
 
 ### [Creating a session](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#creating-session)
 
+Utilizando solo las API definidas por JPA, tal y como se describe en la [configuración usando XML de JPA](#configuration-using-jpa-xml), se puede obtener un `EntityManagerFactory`:
+
+```java
+EntityManagerFactory emf = Persistence.createEntityManagerFactory("my-persistence-unit");
+EntityManager entityManager = emf.createEntityManager();
+```
+
+Cuando se finaliza con el `EntityManager` se debe cerrar explícitamente para liberar los recursos:
+
+```java
+entityManager.close();
+```
+
+Por otro lado, si se parte de una `SessionFactory`, vista en la [configuración usando la API de Hibernate](#configuration-using-hibernate-api), se puede hacer algo así:
+
+```java
+Session session = sessionFactory.openSession();
+```
+
+Al finalizar, también se debe cerrar la sesión para liberar los recursos:
+
+```java
+session.close();
+```
+
+#### Injecting the EntityManager
+
+Si se está escribiendo código para algún tipo de entorno de contenedor como Quarkus, probablemente se obtendrá `EntityManager` mediante algún tipo de inyección de dependencia.
+
+Por ejemplo, en el **contexto de Spring**, especialmente con Spring Boot, el framework se encarga de gestionar el ciclo de vida del `EntityManager` y puede ser inyectado directamente en los componentes de servicio usando `@Autowired`.
+
+Spring se encarga de crear y gestionar esta instancia. La anotación `@Transactional` asegura que las operaciones de base de datos se realicen dentro de una transacción. Finalmente, Spring se encarga de abrir y cerrar la transacción y el `EntityManager` automáticamente.
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.persistence.EntityManager;
+
+@Service
+public class MyService {
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Transactional
+    public void performDatabaseOperations() {
+        MyEntity entity = new MyEntity();
+        entity.setId(1L);
+        entity.setName("Test Name");
+
+        entityManager.persist(entity);
+
+        MyEntity retrievedEntity = entityManager.find(MyEntity.class, 1L);
+        retrievedEntity.setName("Updated Name");
+
+        entityManager.merge(retrievedEntity);
+    }
+}
+```
+
+### [Managing transactions](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#managing-transactions)
+
+Para controlar transacciones de base de datos utilizando las APIs estándar de JPA, la interfaz `EntityTransaction` proporciona los métodos necesarios. El patrón recomendado para manejar transacciones con JPA es el siguiente:
+
+```java
+EntityManager entityManager = entityManagerFactory.createEntityManager();
+EntityTransaction tx = entityManager.getTransaction();
+try {
+    tx.begin();
+    // do some work
+    // ...
+    tx.commit();
+}
+catch (Exception e) {
+    if (tx.isActive()) tx.rollback();
+    throw e;
+}
+finally {
+    entityManager.close();
+}
+```
+
+Usando las APIs nativas de Hibernate, podríamos escribir algo muy similar a lo que haríamos con JPA estándar, pero dado que este tipo de código puede ser extremadamente tedioso, Hibernate nos ofrece una opción mucho más conveniente:
+
+```java
+sessionFactory.inTransaction(session -> {
+    // do the work
+    // ...
+});
+```
+
+JPA no tiene una forma estándar de establecer el tiempo de espera de la transacción, pero Hibernate sí la tiene:
+
+```java
+session.getTransaction().setTimeout(30); // 30 seconds
+```
+
+### [Operations on the persistence context](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#persistence-operations)
+
+Las siguientes operaciones de `EntityManager` permiten interactuar con el contexto de persistencia y programar modificaciones en los datos:
+
+- **`persist(Object)`**: hace que un objeto transitorio (nuevo) sea persistente, programando una instrucción SQL INSERT para su ejecución futura.
+
+- **`remove(Object)`**: hace que un objeto persistente sea transitorio, programando una instrucción SQL DELETE para su ejecución futura.
+
+- **`merge(Object)`**: copia el estado de un objeto desasociado a una instancia persistente gestionada correspondiente y devuelve el objeto persistente. Se utiliza para actualizar el estado de un objeto desasociado y sincronizarlo con el contexto de persistencia.
+
+- **`detach(Object)`**: desasocia un objeto persistente de la sesión sin afectar la base de datos de modo que los cambios realizados en el objeto no se sincronicen con la base de datos.
+
+- **`clear()`**: vacía el contexto de persistencia y desasocia todas sus entidades. Se utiliza para limpiar el contexto de persistencia, eliminando todas las entidades gestionadas.
+
+- **`flush()`**: detecta los cambios realizados en los objetos persistentes asociados con la sesión y sincroniza el estado de la base de datos con el estado de la sesión ejecutando instrucciones SQL INSERT, UPDATE y DELETE. Se utiliza para sincronizar el estado del contexto de persistencia con la base de datos de inmediato.
+
+Tenga en cuenta que `persist()` y `remove()` no tienen un efecto inmediato en la base de datos y, en cambio, simplemente programan un comando para su ejecución posterior.
+
+Por otro lado, excepto getReference(), todas las operaciones siguientes dan como resultado un acceso inmediato a la base de datos:
+
+- **`find(Class<T> entityClass, Object primaryKey)`**: obtiene una instancia persistente de una entidad dada su clase y su identificador. Si la entidad no está en la base de datos, devuelve null.
+
+- **`find(Class<T> entityClass, Object primaryKey, LockModeType lockMode)`**: obtiene una instancia persistente de una entidad dada su clase y su identificador pero permite especificar un modo de bloqueo optimista o pesimista al recuperar la entidad.
+
+- **`getReference(Class<T> entityClass, Object primaryKey)`**: obtiene una referencia a una entidad persistente dada su clase y su identificador, sin cargar realmente su estado desde la base de datos. Devuelve un proxy de la entidad. La entidad no se carga hasta que se acceda a ella. Esto es útil para manejar entidades que se espera que se carguen en el futuro.
+
+- **`getReference(Object entity)`**: obtiene una referencia a una entidad persistente con la misma identidad que la instancia desasociada dada, sin cargar su estado desde la base de datos.
+
+- **`refresh(Object entity)`**: refresca el estado persistente de una entidad mediante una nueva consulta SQL para recuperar su estado actual desde la base de datos. Sincroniza el estado de la entidad con la base de datos, sobreescribiendo cualquier cambio no sincronizado.
+
+- **`refresh(Object entity, LockModeType lockMode)`**: igual que el anterior pero permite especificar un modo de bloqueo optimista o pesimista al refrescar la entidad.
+
+- **`lock(Object entity, LockModeType lockMode)`**: obtiene un bloqueo optimista o pesimista en una entidad persistente para manejar la concurrencia.
+
+En el contexto de JPA y Hibernate, una vez que **ocurre una excepción** durante la interacción con la base de datos, el estado de la sesión (o el contexto de persistencia) puede quedar inconsistente.
+
+Después de una excepción, es recomendable **cerrar la sesión y abrir una nueva**.
+
+### [Cascading persistence operations](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#cascade)
+
+En el contexto de JPA y Hibernate, cuando hablamos de asociaciones entre entidades, es común que el ciclo de vida de una entidad hija esté completamente dependiente del ciclo de vida de una entidad padre. Esto es especialmente relevante en las asociaciones de muchos a uno (many-to-one) y uno a uno (one-to-one).
+
+El uso de **_cascading_** en JPA y Hibernate permite propagar operaciones desde una entidad principal a las entidades asociadas automáticamente, simplificando la gestión del ciclo de vida de estas entidades.
+
+Para configurar el **_cascading_**, se especifica el atributo `cascade` en las anotaciones de asociación como `@OneToMany`, `@OneToOne`, `@ManyToMany`, o `@ManyToOne`. En relaciones uno a uno o muchos a uno, se puede usar `orphanRemoval=true` en las anotaciones. Esto asegura que cualquier entidad hija que ya no esté asociada con la entidad padre sea eliminada automáticamente.
+
+```java
+@Entity
+class Order {
+    ...
+    @OneToMany(mappedby=Item_.ORDER,
+               // cascade persist(), remove(), and refresh() from Order to Item
+               cascade={PERSIST,REMOVE,REFRESH},
+               // also remove() orphaned Items
+               orphanRemoval=true)
+    private Set<Item> items;
+    ...
+}
+```
+
+Hay varios tipos de **_cascading_**:
+
+- **CascadeType.PERSIST**: Propaga la operación de persistencia. Cuando se persiste una entidad principal, las entidades asociadas también se persisten automáticamente.
+
+- **CascadeType.MERGE**: Propaga la operación de fusión. Cuando se fusiona una entidad principal, las entidades asociadas también se fusionan.
+
+- **CascadeType.REMOVE**: Propaga la operación de eliminación. Cuando se elimina una entidad principal, las entidades asociadas también se eliminan automáticamente.
+
+- **CascadeType.REFRESH**: Propaga la operación de actualización. Cuando se actualiza una entidad principal, las entidades asociadas también se actualizan.
+
+- **CascadeType.DETACH**: Propaga la operación de desasociación. Cuando una entidad principal se desasocia del contexto de persistencia, las entidades asociadas también se desasocian.
+
+- **CascadeType.ALL**: Incluye todas las operaciones de cascada mencionadas anteriormente.
+
+### [Flushing the session](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#flush)
+
+**_Flush_** es el proceso mediante el cual Hibernate sincroniza el estado de las entidades que han sido modificadas en la memoria con el estado persistente en la base de datos. Esto implica la ejecución de sentencias SQL INSERT, UPDATE y DELETE para asegurar que las modificaciones hechas en el contexto de persistencia se reflejen en la base de datos.
+
+Por defecto, flush se activa en las siguientes situaciones:
+
+- Cuando se hace un COMMIT de la transacción.
+
+- Antes de la ejecución de una consulta.
+
+- Cuando se llama directamente a `flush()`.
+
+Este comportamiento se puede controlar **configurando explícitamente el modo de descarga**. En JPA se modifica de esta forma:
+
+```java
+entityManager.setFlushMode(FlushModeType.COMMIT);
+```
+
+- **FlushModeType.COMMIT**: _flush_ antes de confirmar la transacción
+
+- **FlushModeType.AUTO**: _flush_ antes de confirmar la transacción y antes de la ejecución de una consulta cuyos resultados podrían verse afectados por modificaciones mantenidas en la memoria.
+
+Por otro lado, en Hibernate se hace de esta forma:
+
+```java
+session.setHibernateFlushMode(FlushMode.MANUAL);
+```
+
+- **FlushMode.MANUAL**: nunca se hace _flush_ de forma automática
+
+- **FlushMode.COMMIT**: _flush_ antes de confirmar la transacción
+
+- **FlushMode.AUTO**: _flush_ antes de confirmar la transacción y antes de la ejecución de una consulta cuyos resultados podrían verse afectados por modificaciones mantenidas en la memoria.
+
+- **FlushMode.ALWAYS**: _flush_ antes de confirmar la transacción y antes de la ejecución de cada consulta.
+
+Dado que el _flush_ es una operación algo costosa, configurar el modo de vaciado en COMMIT ocasionalmente puede ser una optimización útil.
+
+Reducir el costo de las operaciones de _flush_ en Hibernate puede ser crucial para mejorar el rendimiento, especialmente en aplicaciones con grandes volúmenes de datos o en entornos con alta concurrencia. Otra forma efectiva de lograr esto es cargando **entidades en modo de solo lectura**:
+
+- **`Session.setDefaultReadOnly(boolean)`**: establece si todas las entidades cargadas por una sesión deben ser tratadas como solo lectura por defecto.
+
+- **`SelectionQuery.setReadOnly(boolean)`**: configura si las entidades devueltas por una consulta específica deben ser tratadas como solo lectura.
+
+- **`Session.setReadOnly(Object, boolean)`**: cambia el estado de una entidad específica que ya ha sido cargada por la sesión para que sea tratada como de solo lectura o no.
+
+### [Queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#queries)
+
 TODO
 
 ---
