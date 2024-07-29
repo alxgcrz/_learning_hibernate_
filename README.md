@@ -1785,7 +1785,7 @@ Hay varios tipos de **_cascading_**:
 
 **_Flush_** es el proceso mediante el cual Hibernate sincroniza el estado de las entidades que han sido modificadas en la memoria con el estado persistente en la base de datos. Esto implica la ejecución de sentencias SQL INSERT, UPDATE y DELETE para asegurar que las modificaciones hechas en el contexto de persistencia se reflejen en la base de datos.
 
-Por defecto, flush se activa en las siguientes situaciones:
+Por defecto, _flush_ se activa en las siguientes situaciones:
 
 - Cuando se hace un COMMIT de la transacción.
 
@@ -1828,6 +1828,243 @@ Reducir el costo de las operaciones de _flush_ en Hibernate puede ser crucial pa
 - **`Session.setReadOnly(Object, boolean)`**: cambia el estado de una entidad específica que ya ha sido cargada por la sesión para que sea tratada como de solo lectura o no.
 
 ### [Queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#queries)
+
+Hibernate ofrece tres formas complementarias de escribir consultas:
+
+- **Hibernate Query Language (HQL)**
+
+  - HQL es un superconjunto extremadamente poderoso de JPQL (Java Persistence Query Language).
+
+  - Abstrae la mayoría de las características de los dialectos modernos de SQL.
+
+  - Permite escribir consultas en un lenguaje orientado a objetos que trabaja directamente con las entidades de Hibernate, en lugar de trabajar con tablas y columnas de la base de datos.
+
+```java
+String hql = "FROM MyEntity WHERE name = :name";
+Query query = session.createQuery(hql);
+query.setParameter("name", "John");
+List<MyEntity> results = query.list();
+```
+
+- **JPA Criteria Query API**
+
+  - La API de criterios de JPA, junto con las extensiones de Hibernate, permite construir casi cualquier consulta HQL de forma programática.
+
+  - Debido a que utiliza una API basada en clases Java, permite la verificación de tipos en tiempo de compilación, evitando errores comunes de consulta.
+
+```java
+// Obtener el EntityManager
+EntityManager em = entityManagerFactory.createEntityManager();
+
+// Crear el CriteriaBuilder
+CriteriaBuilder cb = em.getCriteriaBuilder();
+
+// Crear un CriteriaQuery para la entidad Person
+CriteriaQuery<Person> cq = cb.createQuery(Person.class);
+
+// Definir la raíz de la consulta (la tabla de la que se seleccionarán los datos)
+Root<Person> person = cq.from(Person.class);
+
+// Añadir una condición WHERE (filtro)
+cq.where(cb.equal(person.get("lastName"), "Smith"));
+
+// Crear la consulta y obtener los resultados
+TypedQuery<Person> query = em.createQuery(cq);
+List<Person> results = query.getResultList();
+```
+
+- **Consultas SQL nativas**
+
+  - Permite utilizar todas las características del dialecto SQL específico de la base de datos utilizada.
+
+  - En algunos casos, las consultas SQL nativas pueden ser más eficientes que las consultas generadas por Hibernate.
+
+```java
+// Obtener el EntityManager
+EntityManager em = entityManagerFactory.createEntityManager();
+
+// Crear una consulta SQL nativa
+Query query = em.createNativeQuery("SELECT * FROM Person WHERE lastName = :lastName", Person.class);
+query.setParameter("lastName", "Smith");
+
+// Obtener los resultados
+List<Person> results = query.getResultList();
+```
+
+### [HQL queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#hql-queries)
+
+Las consultas se realizan mediante la API `Session` o `EntityManager`. El método que se utiliza depende de qué tipo de consulta sea.
+
+- **Consultas de selección**
+
+  Las consultas de selección son aquellas que retornan **una lista de resultados y sin modificar los datos** en la base de datos. Estas consultas generalmente comienzan con las palabras clave `select` o `from`.
+
+  Los métodos más comunes para ejecutar las consultas son `getResultList()`, `getSingleResult()`, `getSingleResultOrNull()`.
+
+  - Ejemplo con la API **`Session`**:
+
+  ```java
+  // Consulta HQL de selección
+  List<Book> matchingBooks =
+    session.createSelectionQuery("from Book where title like :titleSearchPattern", Book.class)
+        .setParameter("titleSearchPattern", titleSearchPattern)
+        .getResultList();
+  ```
+
+  - Ejemplo con la API JPA-standard **`EntityManager`**:
+
+  ```java
+  List<Book> matchingBooks =
+    entityManager.createQuery("select b from Book b where b.title like :titleSearchPattern", Book.class)
+        .setParameter("titleSearchPattern", titleSearchPattern)
+        .getResultList();
+  ```
+
+- **Consultas de mutación**
+
+  Las consultas de mutación son aquellas que **modifican datos y retornan el número de filas afectadas**. Estas consultas generalmente comienzan con las palabras clave `insert`, `update` o `delete`.
+
+  - Ejemplo con la API **`Session`**:
+
+  ```java
+  // Consulta HQL de mutación
+  int updatedRows = session.createMutationQuery("update Book set price = :newPrice where title = :title")
+        .setParameter("newPrice", newPrice)
+        .setParameter("title", title)
+        .executeUpdate();
+  ```
+
+  - Ejemplo con la API JPA-standard **`EntityManager`**:
+
+  ```java
+  // Consulta JPA de mutación
+  int updatedRows = entityManager.createQuery("update Book b set b.price = :newPrice where b.title = :title")
+        .setParameter("newPrice", newPrice)
+        .setParameter("title", title)
+        .executeUpdate();
+
+  ```
+
+En las consultas anteriores, tanto `:titleSearchPattern` como `:newPrice` o `:title` son **parámetros con nombre**.
+
+También es posible identificar parámetros mediante un número. Estos parámetros se llaman **parámetros ordinales**.
+
+```java
+List<Book> matchingBooks =
+        session.createSelectionQuery("from Book where title like ?1", Book.class)
+            .setParameter(1, titleSearchPattern)
+            .getResultList();
+```
+
+**NOTA**: Nunca se debe concatenar la entrada del usuario con HQL y pasar la cadena concatenada a `createSelectionQuery()`. Esto abriría la posibilidad de un ataque por Inyección SQL y la ejecución de código arbitrario en el servidor de base de datos.
+
+```java
+// Inyección SQL
+String unsafeQuery = "from Book where title like '" + userInput + "'";
+List<Book> books = session.createQuery(unsafeQuery, Book.class).getResultList();
+```
+
+Para prevenir estos ataques, **hay que usar parámetros con nombre o parámetros ordinales** ya que Hibernate maneja de forma segura el valor proporcionado por el usuario escapando cualquier carácter no seguro.
+
+Si se espera que una consulta devuelva un único resultado, se puede usar `getSingleResult()`. Este método lanza una excepción si no hay ninguna fila que cumpla la selección:
+
+```java
+Book book = 
+        session.createSelectionQuery("from Book where isbn = ?1", Book.class)
+            .setParameter(1, isbn)
+            .getSingleResult();
+```
+
+O, si se espera que la consulta devuelva como máximo un resultado, se puede usar `getSingleResultOrNull()`:
+
+```java
+Book bookOrNull =
+        session.createSelectionQuery("from Book where isbn = ?1", Book.class)
+            .setParameter(1, isbn)
+            .getSingleResultOrNull();
+```
+
+### [Criteria queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#criteria-queries)
+
+En una interfaz de búsqueda, donde los usuarios pueden filtrar resultados basándose en varios criterios, como el título del libro o el nombre del autor, se puede construir una consulta HQL para obtener estos resultados. Sin embargo, construir consultas HQL mediante concatenación de cadenas puede ser frágil y propenso a errores. En su lugar, utilizar consultas basadas en criterios ofrece una alternativa más robusta y flexible.
+
+En Hibernate 6, cada consulta HQL se compila en una consulta de criterios antes de ser traducida a SQL. Esto garantiza que la semántica de HQL y las consultas de criterios sean idénticas.
+
+Primero se necesita un objeto para construir consultas de criterios. Utilizando las API estándar de JPA, este objeto es un `CriteriaBuilder`, y se obtiene a partir del `EntityManagerFactory`:
+
+```java
+CriteriaBuilder builder = entityManagerFactory.getCriteriaBuilder();
+```
+
+Pero si se está trabajando con un `SessionFactory`, se obtiene un `HibernateCriteriaBuilder`, que extiende de `CriteriaBuilder` y añade más operaciones que JPQL no tiene:
+
+```java
+HibernateCriteriaBuilder builder = sessionFactory.getCriteriaBuilder();
+```
+
+Sin embargo, si se está trabajando con `EntityManagerFactory`, es posible obtener un `HibernateCriteriaBuilder` de dos formas:
+
+```java
+// Forma 1
+HibernateCriteriaBuilder builder =
+        entityManagerFactory.unwrap(SessionFactory.class).getCriteriaBuilder();
+
+// Forma 2
+HibernateCriteriaBuilder builder =
+        (HibernateCriteriaBuilder) entityManagerFactory.getCriteriaBuilder();
+```
+
+A partir del objeto `HibernateCriteriaBuilder` o `CriteriaBuilder` se crea un objeto que corresponde con el tipo de consulta:
+
+- **`CriteriaQuery`**: para consultas de selección
+
+  ```java
+  // Consulta de selección
+  CriteriaQuery<Book> criteriaQuery = criteriaBuilder.createQuery(Book.class);
+  Root<Book> root = criteriaQuery.from(Book.class);
+
+  // Definir las condiciones
+  criteriaQuery.select(root).where(criteriaBuilder.like(root.get("title"), "%Java%"));
+  ```
+
+- **`CriteriaUpdate`**: para modificaciones de registros
+
+   ```java
+   // Consulta de actualización
+   CriteriaUpdate<Book> criteriaUpdate = criteriaBuilder.createCriteriaUpdate(Book.class);
+   Root<Book> root = criteriaUpdate.from(Book.class);
+
+   // Definir la actualización
+   criteriaUpdate.set("price", 29.99)
+              .where(criteriaBuilder.equal(root.get("title"), "Hibernate in Action"));
+   ```
+
+- **`CriteriaDelete`**: para el borrado de registros
+
+   ```java
+   // Consulta de eliminación
+   CriteriaDelete<Book> criteriaDelete = criteriaBuilder.createCriteriaDelete(Book.class);
+   Root<Book> root = criteriaDelete.from(Book.class);
+
+    // Definir la eliminación
+   criteriaDelete.where(criteriaBuilder.equal(root.get("title"), "Old Book Title"));
+   ```
+
+Una vez se ha obtenido la consulta y se ha aplicado el predicado, se ejecutan como las consultas HQL:
+
+```java
+List<Book> matchingBooks =
+        session.createSelectionQuery(criteriaQuery)
+            .getResultList();
+```
+
+Las consultas de mutación funcionan de forma similar:
+
+```java
+int rowsAffected = session.createMutationQuery(criteriaDelete).executeUpdate();
+```
+
+### [Native SQL queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#native-queries)
 
 TODO
 
@@ -1936,6 +2173,7 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 - <https://hibernate.org>
 - <https://hibernate.org/orm/documentation/6.5>
 - <https://hibernate.org/orm/documentation/getting-started>
+- <https://docs.jboss.org/hibernate/orm/6.5/querylanguage/html_single/Hibernate_Query_Language.html>
 - <https://docs.jboss.org/hibernate/orm/6.5/javadocs/>
 - <https://jakarta.ee/specifications/platform/10/apidocs/>
 - <https://www.baeldung.com/learn-jpa-hibernate>
