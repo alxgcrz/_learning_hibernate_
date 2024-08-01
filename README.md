@@ -1,6 +1,6 @@
 # Hibernate
 
-... EN DESARROLLO ...
+> :warning: **DOCUMENTO EN DESARROLLO** :warning:
 
 ## Introducción
 
@@ -22,7 +22,7 @@ Entre sus características principales se incluyen:
 
 En resumen, Hibernate simplifica el desarrollo de aplicaciones Java al proporcionar una capa de abstracción entre la lógica de negocio y la capa de persistencia de datos, permitiendo a los desarrolladores centrarse en la funcionalidad de la aplicación sin tener que preocuparse por los detalles de la manipulación de la base de datos. Esto lo convierte en una herramienta indispensable en el arsenal de cualquier desarrollador Java que trabaje con bases de datos relacionales.
 
-> Sección generada por ChatGPT
+:warning: **Introducción generada por ChatGPT**
 
 ## [Configuration and bootstrap](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration)
 
@@ -1893,7 +1893,7 @@ List<Person> results = query.getResultList();
 
 ### [HQL queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#hql-queries)
 
-Las consultas se realizan mediante la API `Session` o `EntityManager`. El método que se utiliza depende de qué tipo de consulta sea.
+Las consultas se realizan mediante la API `Session` para Hibernate o `EntityManager` según el estándar JPA. El método que se utiliza depende de qué tipo de consulta sea.
 
 - **Consultas de selección**
 
@@ -1956,7 +1956,7 @@ List<Book> matchingBooks =
             .getResultList();
 ```
 
-**NOTA**: Nunca se debe concatenar la entrada del usuario con HQL y pasar la cadena concatenada a `createSelectionQuery()`. Esto abriría la posibilidad de un ataque por Inyección SQL y la ejecución de código arbitrario en el servidor de base de datos.
+> :warning: **Nunca se debe concatenar la entrada del usuario con HQL** y pasar la cadena concatenada a `createSelectionQuery()`. Esto abriría la posibilidad de **ataques por Inyección SQL** y la ejecución de código arbitrario en el servidor de base de datos.
 
 ```java
 // Inyección SQL
@@ -2065,6 +2065,77 @@ int rowsAffected = session.createMutationQuery(criteriaDelete).executeUpdate();
 ```
 
 ### [Native SQL queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#native-queries)
+
+Las consultas se realizan mediante la API `Session` para Hibernate o `EntityManager` según el estándar JPA.
+
+- **Selección de datos**
+
+  - **Session method**: `createNativeQuery(String,Class)`
+
+  - **EntityManager method**: `createNativeQuery(String,Class)`
+
+  - **Query execution method**: `getResultList()`, `getSingleResult()`, `getSingleResultOrNull()`
+
+- **Mutación de datos**
+
+  - **Session method**: `createNativeMutationQuery(String)`
+
+  - **EntityManager method**: `createNativeQuery(String)`
+
+  - **Query execution method**: `executeUpdate()`
+
+- **Stored procedure**.
+
+  - **Session method**: `createStoredProcedureCall(String)`
+
+  - **EntityManager method**: `createStoredProcedureQuery(String)`
+
+  - **Query execution method**: `execute()`
+
+Para los casos más simples, Hibernate puede inferir la forma del conjunto de resultados:
+
+```java
+Book book =
+        session.createNativeQuery("select * from Books where isbn = ?1", Book.class)
+            .getSingleResult();
+
+String title =
+        session.createNativeQuery("select title from Books where isbn = ?1", String.class)
+            .getSingleResult();
+```
+
+Sin embargo, para casos más complicados, se necesita usar la anotación `@SqlResultSetMapping` para definir un mapeo con nombre, y pasar ese nombre a `createNativeQuery()`.
+
+Por defecto, **Hibernate no hace un _flush_ de la sesión** antes de la ejecución de una consulta nativa. Esto se debe a que la sesión no está al tanto de qué modificaciones mantenidas en memoria afectarían los resultados de la consulta.
+
+Hay dos maneras de asegurarse de que el contexto de persistencia se haya sincronizado antes de ejecutar esta consulta.
+
+Se puede simplemente forzar un _flush_ llamando a `flush()`, o configurando el modo de flush a ALWAYS:
+
+```java
+// Realizar el flush() antes de la consulta
+session.flush();
+List<Book> books = session.createNativeQuery("SELECT * FROM Book", Book.class).getResultList();
+
+// Configurar el Modo de Flush a 'ALWAYS'
+session.setHibernateFlushMode(FlushMode.ALWAYS);
+List<Book> books = session.createNativeQuery("SELECT * FROM Book", Book.class).getResultList();
+```
+
+Alternativamente, se puede indicar a Hibernate qué estado modificado afecta los resultados de la consulta utilizando el método `addSynchronizedEntityClass(Class entityClass)` o `addSynchronizedEntityName(String entityName)`. Esto asegura que Hibernate realice un _flush_ del contexto de persistencia para las entidades especificadas antes de ejecutar la consulta nativa.
+
+```java
+List<Book> books =
+        session.createNativeQuery("select * from Books", Book.class)
+            .addSynchronizedEntityClass(Book.class)
+            .getResultList()
+```
+
+En el caso de utilizar **HQL (Hibernate Query Language)**, Hibernate automáticamente sincroniza el contexto de persistencia (hace un _flush_) antes de ejecutar la consulta si detecta cambios pendientes que afectan los resultados.
+
+En contraste, cuando se ejecuta una consulta **SQL nativa**, Hibernate no tiene conocimiento sobre cómo esta consulta específica puede verse afectada por el estado actual del contexto de persistencia. Es responsabilidad del programador asegurarse de que el contexto de persistencia esté sincronizado (utilizando alguna de las alternativas vistas) antes de ejecutar la consulta.
+
+### [Limits, pagination, and ordering](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#pagination)
 
 TODO
 
