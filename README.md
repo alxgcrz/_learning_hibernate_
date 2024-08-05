@@ -1831,7 +1831,7 @@ Reducir el costo de las operaciones de _flush_ en Hibernate puede ser crucial pa
 
 Hibernate ofrece tres formas complementarias de escribir consultas:
 
-- **Hibernate Query Language (HQL)**
+- [**Hibernate Query Language (HQL)**](#hql-queries)
 
   - HQL es un superconjunto extremadamente poderoso de JPQL (Java Persistence Query Language).
 
@@ -1839,69 +1839,29 @@ Hibernate ofrece tres formas complementarias de escribir consultas:
 
   - Permite escribir consultas en un lenguaje orientado a objetos que trabaja directamente con las entidades de Hibernate, en lugar de trabajar con tablas y columnas de la base de datos.
 
-```java
-String hql = "FROM MyEntity WHERE name = :name";
-Query query = session.createQuery(hql);
-query.setParameter("name", "John");
-List<MyEntity> results = query.list();
-```
+- [**JPA Criteria Query API**](#criteria-queries)
 
-- **JPA Criteria Query API**
-
-  - La API de criterios de JPA, junto con las extensiones de Hibernate, permite construir casi cualquier consulta HQL de forma programática.
+  - Esta API, junto con las extensiones de Hibernate, permite construir casi cualquier consulta HQL de forma programática.
 
   - Debido a que utiliza una API basada en clases Java, permite la verificación de tipos en tiempo de compilación, evitando errores comunes de consulta.
 
-```java
-// Obtener el EntityManager
-EntityManager em = entityManagerFactory.createEntityManager();
-
-// Crear el CriteriaBuilder
-CriteriaBuilder cb = em.getCriteriaBuilder();
-
-// Crear un CriteriaQuery para la entidad Person
-CriteriaQuery<Person> cq = cb.createQuery(Person.class);
-
-// Definir la raíz de la consulta (la tabla de la que se seleccionarán los datos)
-Root<Person> person = cq.from(Person.class);
-
-// Añadir una condición WHERE (filtro)
-cq.where(cb.equal(person.get("lastName"), "Smith"));
-
-// Crear la consulta y obtener los resultados
-TypedQuery<Person> query = em.createQuery(cq);
-List<Person> results = query.getResultList();
-```
-
-- **Consultas SQL nativas**
+- [**Consultas SQL nativas**](#native-sql-queries)
 
   - Permite utilizar todas las características del dialecto SQL específico de la base de datos utilizada.
 
   - En algunos casos, las consultas SQL nativas pueden ser más eficientes que las consultas generadas por Hibernate.
 
-```java
-// Obtener el EntityManager
-EntityManager em = entityManagerFactory.createEntityManager();
-
-// Crear una consulta SQL nativa
-Query query = em.createNativeQuery("SELECT * FROM Person WHERE lastName = :lastName", Person.class);
-query.setParameter("lastName", "Smith");
-
-// Obtener los resultados
-List<Person> results = query.getResultList();
-```
-
 ### [HQL queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#hql-queries)
 
-Las consultas se realizan mediante la API `Session` para Hibernate o `EntityManager` según el estándar JPA. El método que se utiliza depende de qué tipo de consulta sea.
+Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/Session.html) de Hibernate o [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) según el estándar JPA.
 
-- **Consultas de selección**
+> :eyes: La interfaz `Session` de Hibernate hereda de la interfaz `EntityManager` de JPA
+
+- **Consultas de SELECCIÓN**
 
   Las consultas de selección son aquellas que retornan **una lista de resultados y sin modificar los datos** en la base de datos. Estas consultas generalmente comienzan con las palabras clave `select` o `from`.
 
-  Los métodos más comunes para ejecutar las consultas son `getResultList()`, `getSingleResult()`, `getSingleResultOrNull()`.
-
-  - Ejemplo con la API **`Session`**:
+  - Ejemplo con método de la interfaz [`QueryProducer`]((https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html)) de la cual hereda **`Session`** de la API de Hibernate:
 
   ```java
   // Consulta HQL de selección
@@ -1911,7 +1871,7 @@ Las consultas se realizan mediante la API `Session` para Hibernate o `EntityMana
         .getResultList();
   ```
 
-  - Ejemplo con la API JPA-standard **`EntityManager`**:
+  - Ejemplo con método de la interfaz [`EntityManager`]((https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager)) de la API estándar JPA:
 
   ```java
   List<Book> matchingBooks =
@@ -1920,11 +1880,26 @@ Las consultas se realizan mediante la API `Session` para Hibernate o `EntityMana
         .getResultList();
   ```
 
-- **Consultas de mutación**
+  - Para ejecutar la consulta se utilizan métodos de la interfaz [`SelectionQuery<R>`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/SelectionQuery.html) de Hibernate o [`Query`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/query) del estándar JPA como son `getResultList()` o `getSingleResult()`:
+
+  ```java
+  // Crear un objeto de la interfaz 'TypedQuery', que es un subtipo de 'Query'
+  TypedQuery<Book> query = 
+                entityManager.createQuery("select b from Book b where b.title like :titleSearchPattern", Book.class)
+                        .setParameter("titleSearchPattern", titleSearchPattern);
+  
+  // Ejecutar la consulta sobre el objeto 'query'
+  Book book = query.getSingleResult();
+
+  // Ejecutar la consulta sobre el objeto 'query'
+  List<Book> books = query.getResultList();
+  ```
+
+- **Consultas de MUTACIÓN**
 
   Las consultas de mutación son aquellas que **modifican datos y retornan el número de filas afectadas**. Estas consultas generalmente comienzan con las palabras clave `insert`, `update` o `delete`.
 
-  - Ejemplo con la API **`Session`**:
+  - Ejemplo con método de la interfaz [**`QueryProducer`**](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate:
 
   ```java
   // Consulta HQL de mutación
@@ -1934,7 +1909,7 @@ Las consultas se realizan mediante la API `Session` para Hibernate o `EntityMana
         .executeUpdate();
   ```
 
-  - Ejemplo con la API JPA-standard **`EntityManager`**:
+  - Ejemplo con método de la interfaz [**`EntityManager`**]((https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager)) de la API estándar JPA:
 
   ```java
   // Consulta JPA de mutación
@@ -1944,6 +1919,21 @@ Las consultas se realizan mediante la API `Session` para Hibernate o `EntityMana
         .executeUpdate();
 
   ```
+
+  - Para ejecutar la consulta se utilizan métodos de la interfaz [`MutationQuery`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/MutationQuery.html) de Hibernate o [`Query`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/query) del estándar JPA:
+
+  ```java
+  // Crear un objeto de la interfaz 'Query'
+  Query updateQuery = 
+    entityManager.createQuery("update Book b set b.price = :newPrice where b.title = :title")
+      .setParameter("newPrice", newPrice)
+      .setParameter("title", title);
+  
+  // Ejecutar el update
+  int updatedRows = updateQuery.executeUpdate();
+  ```
+
+#### Named parameters
 
 En las consultas anteriores, tanto `:titleSearchPattern` como `:newPrice` o `:title` son **parámetros con nombre**.
 
@@ -1965,24 +1955,6 @@ List<Book> books = session.createQuery(unsafeQuery, Book.class).getResultList();
 ```
 
 Para prevenir estos ataques, **hay que usar parámetros con nombre o parámetros ordinales** ya que Hibernate maneja de forma segura el valor proporcionado por el usuario escapando cualquier carácter no seguro.
-
-Si se espera que una consulta devuelva un único resultado, se puede usar `getSingleResult()`. Este método lanza una excepción si no hay ninguna fila que cumpla la selección:
-
-```java
-Book book = 
-        session.createSelectionQuery("from Book where isbn = ?1", Book.class)
-            .setParameter(1, isbn)
-            .getSingleResult();
-```
-
-O, si se espera que la consulta devuelva como máximo un resultado, se puede usar `getSingleResultOrNull()`:
-
-```java
-Book bookOrNull =
-        session.createSelectionQuery("from Book where isbn = ?1", Book.class)
-            .setParameter(1, isbn)
-            .getSingleResultOrNull();
-```
 
 ### [Criteria queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#criteria-queries)
 
@@ -2066,17 +2038,17 @@ int rowsAffected = session.createMutationQuery(criteriaDelete).executeUpdate();
 
 ### [Native SQL queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#native-queries)
 
-Las consultas se realizan mediante la API `Session` para Hibernate o `EntityManager` según el estándar JPA.
+Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/Session.html) de Hibernate o [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) según el estándar JPA:
 
-- **Selección de datos**
+- **Consultas de SELECCIÓN de datos**
 
   - **Session method**: `createNativeQuery(String,Class)`
 
   - **EntityManager method**: `createNativeQuery(String,Class)`
 
-  - **Query execution method**: `getResultList()`, `getSingleResult()`, `getSingleResultOrNull()`
+  - **Query execution method**: `getResultList()`, `getSingleResult()`
 
-- **Mutación de datos**
+- **Consultas de MUTACIÓN de datos**
 
   - **Session method**: `createNativeMutationQuery(String)`
 
@@ -2136,6 +2108,26 @@ En el caso de utilizar **HQL (Hibernate Query Language)**, Hibernate automática
 En contraste, cuando se ejecuta una consulta **SQL nativa**, Hibernate no tiene conocimiento sobre cómo esta consulta específica puede verse afectada por el estado actual del contexto de persistencia. Es responsabilidad del programador asegurarse de que el contexto de persistencia esté sincronizado (utilizando alguna de las alternativas vistas) antes de ejecutar la consulta.
 
 ### [Limits, pagination, and ordering](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#pagination)
+
+Si una consulta puede devolver más resultados de los que se pueden manejar a la vez, se puede especificar:
+
+- un límite en el número máximo de filas devueltas, y,
+
+- opcionalmente, un desplazamiento (_offset_), que indica la primera fila a devolver de un conjunto de resultados ordenado. Este desplazamiento se utiliza para paginar los resultados de una consulta.
+
+Hay dos formas de añadir un límite o desplazamiento a una consulta HQL o SQL nativa:
+
+- utilizando la sintaxis del propio lenguaje de consulta
+
+- utilizando métodos como `setFirstResult(...)` y `setMaxResults(...)` de la interfaz [`SelectionQuery`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/SelectionQuery.html) de la API de Hibernate o [`Query`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/query) de la API estándar JPA.
+
+```java
+List<Book> books =
+        session.createSelectionQuery("from Book where title like ?1 order by title", Book.class)
+            .setParameter(1, titlePattern)
+            .setMaxResults(MAX_RESULTS)
+            .getResultList();
+```
 
 TODO
 
