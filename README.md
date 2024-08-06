@@ -1725,11 +1725,13 @@ Las siguientes operaciones de `EntityManager` permiten interactuar con el contex
 
 Tenga en cuenta que `persist()` y `remove()` no tienen un efecto inmediato en la base de datos y, en cambio, simplemente programan un comando para su ejecución posterior.
 
-Por otro lado, excepto getReference(), todas las operaciones siguientes dan como resultado un acceso inmediato a la base de datos:
+Por otro lado, excepto `getReference()`, todas las operaciones siguientes dan como resultado un acceso inmediato a la base de datos:
 
 - **`find(Class<T> entityClass, Object primaryKey)`**: obtiene una instancia persistente de una entidad dada su clase y su identificador. Si la entidad no está en la base de datos, devuelve null.
 
 - **`find(Class<T> entityClass, Object primaryKey, LockModeType lockMode)`**: obtiene una instancia persistente de una entidad dada su clase y su identificador pero permite especificar un modo de bloqueo optimista o pesimista al recuperar la entidad.
+
+- **`get(Class<T> entityType, Object id)`**: devuelve la instancia persistente de la clase de entidad dada con el identificador proporcionado, o `null` si no existe tal instancia persistente. Si la instancia ya está asociada con la sesión, se devuelve esa instancia. Este método nunca devuelve una instancia no inicializada.
 
 - **`getReference(Class<T> entityClass, Object primaryKey)`**: obtiene una referencia a una entidad persistente dada su clase y su identificador, sin cargar realmente su estado desde la base de datos. Devuelve un proxy de la entidad. La entidad no se carga hasta que se acceda a ella. Esto es útil para manejar entidades que se espera que se carguen en el futuro.
 
@@ -1861,7 +1863,7 @@ Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hib
 
   Las consultas de selección son aquellas que retornan **una lista de resultados y sin modificar los datos** en la base de datos. Estas consultas generalmente comienzan con las palabras clave `select` o `from`.
 
-  - Ejemplo con método de la interfaz [`QueryProducer`]((https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html)) de la cual hereda **`Session`** de la API de Hibernate:
+  - Ejemplo con método `createSelectionQuery(String, Class)` de la interfaz [`QueryProducer`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate:
 
   ```java
   // Consulta HQL de selección
@@ -1871,7 +1873,7 @@ Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hib
         .getResultList();
   ```
 
-  - Ejemplo con método de la interfaz [`EntityManager`]((https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager)) de la API estándar JPA:
+  - Ejemplo con método `createQuery(String, Class)` de la interfaz [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) de la API estándar JPA:
 
   ```java
   List<Book> matchingBooks =
@@ -1899,7 +1901,7 @@ Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hib
 
   Las consultas de mutación son aquellas que **modifican datos y retornan el número de filas afectadas**. Estas consultas generalmente comienzan con las palabras clave `insert`, `update` o `delete`.
 
-  - Ejemplo con método de la interfaz [**`QueryProducer`**](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate:
+  - Ejemplo con método `createMutationQuery(String)` de la interfaz [`QueryProducer`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate:
 
   ```java
   // Consulta HQL de mutación
@@ -1909,7 +1911,7 @@ Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hib
         .executeUpdate();
   ```
 
-  - Ejemplo con método de la interfaz [**`EntityManager`**]((https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager)) de la API estándar JPA:
+  - Ejemplo con método `createQuery(String)` de la interfaz [`EntityManager`]((https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager)) de la API estándar JPA:
 
   ```java
   // Consulta JPA de mutación
@@ -2042,27 +2044,19 @@ Las consultas se realizan mediante la API [`Session`](https://docs.jboss.org/hib
 
 - **Consultas de SELECCIÓN de datos**
 
-  - **Session method**: `createNativeQuery(String,Class)`
+  - Se utiliza el método `createNativeQuery(String, Class)` de la interfaz [`QueryProducer`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate.
 
-  - **EntityManager method**: `createNativeQuery(String,Class)`
+  - Se utiliza el método `createNativeQuery(String, Class)` de la interfaz [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) de la API estándar JPA.
 
-  - **Query execution method**: `getResultList()`, `getSingleResult()`
+  - Para ejecutar la consulta se utilizan métodos de la interfaz [`NativeQuery<T>`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/SelectionQuery.html) de Hibernate o [`Query`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/query) del estándar JPA como son `getResultList()` o `getSingleResult()`.
 
 - **Consultas de MUTACIÓN de datos**
 
-  - **Session method**: `createNativeMutationQuery(String)`
-
-  - **EntityManager method**: `createNativeQuery(String)`
-
-  - **Query execution method**: `executeUpdate()`
-
-- **Stored procedure**.
-
-  - **Session method**: `createStoredProcedureCall(String)`
-
-  - **EntityManager method**: `createStoredProcedureQuery(String)`
-
-  - **Query execution method**: `execute()`
+  - Se utiliza el método `createNativeMutationQuery(String)` de la interfaz [`QueryProducer`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate.
+  
+  - Se utiliza el método `createNativeQuery(String)` de la interfaz [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) de la API estándar JPA.
+  
+  - Para ejecutar la consulta se utiliza el método `executeUpdate()` de la interfaz [`MutationQuery`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/MutationQuery.html) de Hibernate o [`Query`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/query) del estándar JPA.
 
 Para los casos más simples, Hibernate puede inferir la forma del conjunto de resultados:
 
@@ -2129,7 +2123,88 @@ List<Book> books =
             .getResultList();
 ```
 
-TODO
+La clase `SelectionQuery` de Hibernate tiene una forma de **paginar los resultados** de la consulta mediante `setPage(...)`:
+
+```java
+List<Book> books =
+        session.createSelectionQuery("from Book where title like ?1 order by title", Book.class)
+            .setParameter(1, titlePattern)
+            .setPage(Page.first(MAX_RESULTS))
+            .getResultList();
+```
+
+Para obtener el número de páginas de resultados se puede utilizar el métod `getResultCount()`:
+
+```java
+SelectionQuery<Book> query =
+        session.createSelectionQuery("from Book where title like ?1 order by title", Book.class)
+            .setParameter(1, titlePattern);
+long pages = query.getResultCount() / MAX_RESULTS;
+List<Book> books = query.setMaxResults(MAX_RESULTS).getResultList();
+```
+
+Es bastante común que la paginación se combine con la necesidad de **ordenar los resultados** de la consulta por un campo que se determina en tiempo de ejecución. Así que, como alternativa a la cláusula `order by` de HQL, `SelectionQuery` ofrece la capacidad de especificar que los resultados de la consulta deben ordenarse por uno o más campos del tipo de entidad devuelto por la consulta mediante el uso del método `setOrder(...)`:
+
+```java
+List<Book> books =
+        session.createSelectionQuery("from Book where title like ?1", Book.class)
+            .setParameter(1, titlePattern)
+            .setOrder(List.of(Order.asc(Book_.title), Order.asc(Book_.isbn)))
+            .setMaxResults(MAX_RESULTS)
+            .getResultList();
+```
+
+### [Named queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#named-queries)
+
+La anotación `@NamedQuery` permite definir una consulta HQL que se **compila y verifica** como parte del proceso de arranque, lo que permite detectar errores antes de que la consulta se ejecute realmente.
+
+La anotación `@NamedQuery` se puede colocar en cualquier clase, incluso en una clase de entidad.
+
+```java
+@NamedQuery(name="10BooksByTitle",
+            query="from Book where title like :titlePattern order by title fetch first 10 rows only")
+class BookQueries {}
+```
+
+Debemos asegurarnos de que la clase con la anotación `@NamedQuery` sea escaneada por Hibernate, ya sea:
+
+- agregando `<class>org.hibernate.example.BookQueries</class>` a `persistence.xml`, o
+
+- llamando a `configuration.addClass(BookQueries.class)`.
+
+La anotación `@NamedNativeQuery` permite hacer lo mismo para consultas SQL nativas. Sin embargo, en este tipo de consultas Hibernate no puede validar ni verificar la corrección de una consulta escrita en el dialecto SQL nativo de la base de datos.
+
+Según la API, las consultas con nombre se invocan mediante un método u otro:
+
+- **Consultas de SELECCIÓN de datos**
+
+  - Se utiliza el método `createNamedSelectionQuery(String, Class)` de la interfaz [`QueryProducer`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate.
+
+  - Se utiliza el método `createNamedQuery(String, Class)` de la interfaz [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) de la API estándar JPA.
+
+- **Consultas de MUTACIÓN de datos**
+
+  - Se utiliza el método `createNamedMutationQuery(String)` de la interfaz [`QueryProducer`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/query/QueryProducer.html) de la cual hereda **`Session`** de la API de Hibernate.
+
+  - Se utiliza el método `createNamedQuery(String)` de la interfaz [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) de la API estándar JPA.
+
+### [Controlling lookup by id](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#load-access)
+
+Cuando el identificador de la entidad es conocido, una consulta HQL o una consulta SQL nativa puede parecer excesiva. Además, las consultas no hacen un uso eficiente del segundo nivel de caché.
+
+Anteriormente se vio el método [`find(...)`](#operations-on-the-persistence-context) de la interfaz [`EntityManager`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/entitymanager) de la API estándar JPA. Es la forma más básica de realizar una búsqueda por ID. Sin embargo, tiene sus limitaciones y no puede hacer todo.
+
+Por lo tanto, Hibernate, a través de [`Session`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/Session.html), tiene algunas API que simplifican ciertas búsquedas más complicadas:
+
+- **`byId()`**
+
+- **`byMultipleIds()`**
+
+- **`bySimpleNaturalId()`**
+
+- **`byNaturalId()`**
+
+- **`byMultipleNaturalId()`**
 
 ---
 
