@@ -1022,7 +1022,7 @@ Aquí, no hay una columna de clave externa adicional en la tabla `Author`, ya qu
 
 #### [Many-to-many](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#many-to-many)
 
-Una asociación unidireccional de muchos a muchos se representa como un atributo con valor de colección. Siempre se asigna a una tabla de asociación separada en la base de datos (una _"join table"_ que contiene las claves foráneas de ambas entidades).
+Una **asociación unidireccional de muchos a muchos** se representa como un atributo con valor de colección. Siempre se asigna a una tabla de asociación separada en la base de datos (una _"join table"_ que contiene las claves foráneas de ambas entidades).
 
 Suele suceder que una asociación de muchos a muchos eventualmente resulte ser una entidad disfrazada.
 
@@ -1275,7 +1275,7 @@ Sin embargo, la anotación `@SecondaryTable` nos permite distribuir sus atributo
 Por ejemplo, supongamos que tenemos una entidad _"Employee"_ cuyos datos están distribuidos en dos tablas: _"employee(id as PK, first_name, last_name)"_ y _"employee_details(employee_id as FK, address, phone_number)"_:
 
 ```java
-@import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "employee")
@@ -1690,7 +1690,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.persistence.EntityManager;
+import jakarta.persistence.EntityManager;
 
 @Service
 public class MyService {
@@ -2252,6 +2252,107 @@ Por lo tanto, Hibernate, a través de [`Session`](https://docs.jboss.org/hiberna
 
 ## [Tuning and performance](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#tuning-and-performance)
 
+Una vez que tu programa esté en funcionamiento con Hibernate, es probable que encuentres problemas de rendimiento. Afortunadamente, la mayoría son fáciles de resolver con las herramientas que Hibernate proporciona, pero recuerda que si Hibernate complica más de lo que ayuda en algún caso, no dudes en usar otra herramienta.
+
+Existen dos fuentes principales de posibles cuellos de botella en el rendimiento de un programa que utiliza Hibernate:
+
+- demasiados accesos a la base de datos, y
+
+- consumo de memoria asociado con la caché de primer nivel o caché de sesión.
+
+Por lo tanto, la optimización del rendimiento implica principalmente reducir el número de accesos a la base de datos y/o controlar el tamaño de la caché de sesión.
+
+### [Tuning the connection pool](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#connection-pool)
+
+El pool de conexiones integrado en Hibernate es adecuado para pruebas, pero no está diseñado para su uso en producción.
+
+En su lugar, Hibernate admite una variedad de diferentes pools de conexiones, incluido [**Agroal**](https://agroal.github.io/docs.html), recomendado por Hibernate.
+
+Para seleccionar y configurar **Agroal**, se necesita establecer **algunas propiedades de configuración adicionales**. Estas propiedades tienen el prefijo `hibernate.agroal`.
+
+```bash
+# The maximum number of connections present on the pool
+hibernate.agroal.maxSize=10
+# The minimum number of connections present on the pool
+hibernate.agroal.minSize=2
+# The number of connections added to the pool when it is started
+hibernate.agroal.initialSize=5
+# The interval between background validation checks
+hibernate.agroal.validationTimeout=30000
+# The duration of time a connection can be held without causing a leak to be reported
+hibernate.agroal.leakTimeout=60000
+# The duration for eviction of idle connections
+hibernate.agroal.reapTimeout=0
+# The maximum amount of time a thread can wait for a connection, after which an exception is thrown instead
+hibernate.agroal.acquisitionTimeout=30000
+# The maximum amount of time a connection can live, after which it is removed from the pool
+hibernate.agroal.maxLifetime=1800000
+```
+
+Siempre que se establezca al menos una propiedad con el prefijo `hibernate.agroal`, el `AgroalConnectionProvider` se seleccionará automáticamente.
+
+> Sin embargo, en un entorno de contenedor como JBoss, Tomcat o Spring Boot, generalmente **no se necesita configurar un pool de conexiones** a través de Hibernate ya que estos contenedores ofrecen la capacidad de manejar _datasources_ y _pools_ de conexiones.
+
+### [Enabling statement batching](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#statement-batching)
+
+Una mejora en el rendimiento es **activar el agrupamiento automático de declaraciones DML**. El agrupamiento solo ayuda en casos donde un programa ejecuta muchas inserciones, actualizaciones o eliminaciones contra la misma tabla en una sola transacción.
+
+Para activar esta mejora se utiliza la propiedad de configuración [`hibernate.jdbc.batch_size`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/constant-values.html).
+
+### [Association fetching](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#association-fetching)
+
+Lograr un alto rendimiento en ORM significa **minimizar la cantidad de accesos** a la base de datos. La regla más fundamental en ORM es:
+
+- especificar explícitamente todos los datos que se van a necesitar al inicio de una sesión/transacción, y recuperarlos de inmediato en una o dos consultas,
+
+- y solo entonces comenzar a navegar entre asociaciones de entidades persistentes.
+
+Sin duda, la causa más común de un código de acceso a datos con bajo rendimiento en programas Java es el **problema de las consultas N + 1**. Esto es, se recupera una lista de N filas de la base de datos en una consulta inicial, y luego se obtienen las instancias asociadas de la entidad relacionada usando N consultas posteriores, una por cada fila recuperada en la consulta inicial. De ahí el concepto de las "N + 1" consultas.
+
+Por ejemplo, dado este código:
+
+```java
+// Recuperar todos los libros
+List<Book> books = session.createQuery("from Book", Book.class).getResultList();
+
+// Para cada libro, acceder a sus autores
+for (Book book : books) {
+    for (Author author : book.getAuthors()) {
+        System.out.println(book.getTitle() + " by " + author.getName());
+    }
+}
+```
+
+Primero se ejecuta una consulta (`getResultList()`) para recuperar todos los libros y luego, por cada libro, se ejecuta una consulta adicional (`book.getAuthors()`) para recuperar los autores asociados. Si hay N libros, se harán N consultas adicionales para los autores, lo que resulta en un total de **N + 1 consultas**.
+
+Si la relación entre _"Book"_ y _"Author"_ está configurada con carga diferida (`@ManyToMany(fetch = FetchType.LAZY)` o similar), Hibernate realizará una consulta adicional para obtener los autores de cada libro.
+
+Sin embargo, si la relación entre _"Book"_ y _"Author"_ está configurada con carga inmediata (`FetchType.EAGER`), entonces Hibernate podría realizar una única consulta con un JOIN para recuperar tanto los libros como sus autores, evitando las consultas adicionales.
+
+Hibernate recomienda el **_lazy loading_** (carga diferida) en muchas situaciones para mejorar el rendimiento ya que carga las entidades relacionadas cuando se necesitan y permite que la inicialización de la entidad principal sea más rápida si sólo se requiere esta entidad.
+
+Por tanto, es **responsabilidad del desarrollador** saber en que situaciones o contextos se va a necesitar únicamente la entidad principal o también se van a necesitar todas las entidades asociadas.
+
+Para solventar este problema de las **N + 1 consultas** se puede usar el `JOIN FETCH` en la consulta:
+
+```java
+List<Book> books =
+    session.createSelectionQuery("from Book b join fetch b.authors order by b.isbn", Book.class)
+        .getResultList();
+```
+
+Esto asegurará que tanto los libros como los autores se carguen en una única consulta.
+
+### [The second-level cache](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#second-level-cache)
+
+Para mejorar el rendimiento de las aplicaciones que usan bases de datos, se puede usar una **caché de segundo nivel**. Esto significa que en lugar de hacer consultas a la base de datos cada vez que se necesita la información, se pueden guardar datos en memoria y compartirlos entre diferentes sesiones de la aplicación. Esto reduce la cantidad de veces que se accede a la base de datos mejorando el rendimiento.
+
+Sin embargo, utilizar una caché de segundo nivel tiene algunos riesgos. Dado que la caché no siempre está sincronizada con la base de datos, pueden surgir problemas **si la información en la caché no coincide con la base de datos**. Además, una caché de segundo nivel puede complicar la gestión de la concurrencia, es decir, cuando múltiples usuarios o procesos intentan acceder y modificar los datos al mismo tiempo, convirtiéndose en una fuente potencial de errores difíciles de aislar y reproducir.
+
+Por defecto, **Hibernate no guarda entidades en la caché de segundo nivel**. Para usar esta caché, se debe marcar explícitamente las entidades que se van a almacenar en ella con una anotación especial (`@Cache` de `org.hibernate.annotations`). Además, Hibernate no incluye su propia implementación de la caché, por lo que se debe [configurar un proveedor de caché externo](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#second-level-cache-configuration) para que funcione.
+
+### [Stateless sessions](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#stateless-sessions)
+
 TODO
 
 ---
@@ -2356,18 +2457,19 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 ## Referencias
 
-### [Hibernate]
+### Hibernate
 
 - <https://hibernate.org>
 - <https://hibernate.org/orm/documentation/6.5>
 - <https://hibernate.org/orm/documentation/getting-started>
-- <https://docs.jboss.org/hibernate/orm/6.5/querylanguage/html_single/Hibernate_Query_Language.html>
+- [Hibernate Query Language](https://docs.jboss.org/hibernate/orm/6.5/querylanguage/html_single/Hibernate_Query_Language.html)
 - <https://docs.jboss.org/hibernate/orm/6.5/javadocs/>
 - <https://www.baeldung.com/learn-jpa-hibernate>
 
-### [Jakarta JPA]
+### Jakarta JPA
 
-- <https://jakarta.ee/learn/docs/jakartaee-tutorial/current/persist/persistence-intro/persistence-intro.html>
+- <https://jakarta.ee/specifications/persistence/3.2/>
+- [Jakarta JPA](https://jakarta.ee/learn/docs/jakartaee-tutorial/current/persist/persistence-intro/persistence-intro.html)
 - <https://jakarta.ee/specifications/platform/10/apidocs/>
 
 ## Licencia
