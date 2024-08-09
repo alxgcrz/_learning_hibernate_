@@ -246,7 +246,7 @@ En realidad, la clase `org.hibernate.cfg.Configuration` es solo una fachada muy 
 
 ### [Configuration using Hibernate properties file](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration-properties)
 
-Si se utiliza la API [`org.hibernate.cfg.Configuration`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/cfg/Configuration.html) de Hibernate, pero se quiere evitar el uso de ciertas propiedades de configuración directamente en el código Java, se pueden especificar en un archivo llamado `hibernate.properties` y colocar el archivo en la ruta de clase raíz:
+Si se utiliza la API [`org.hibernate.cfg.Configuration`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/cfg/Configuration.html) de Hibernate, pero se quiere evitar el uso de ciertas propiedades de configuración directamente en el código Java, se pueden especificar en un archivo llamado `hibernate.properties` y colocar el archivo en el classpath del proyecto (por ejemplo en `src/main/resources`):
 
 ```bash
 # PostgreSQL
@@ -259,6 +259,31 @@ jakarta.persistence.jdbc.password=zAh7mY42MNshzAQ5
 hibernate.show_sql=true
 hibernate.format_sql=true
 hibernate.highlight_sql=true
+```
+
+Si se está utilizando Hibernate dentro una **aplicación Spring Boot**, es posible que se esté utilizando un fichero `application.properties` o `application.yml`, que es común en este tipo de aplicaciones, tanto para la propia configuración de Spring Boot como para la configuración del acceso a datos. En Spring Boot, muchas propiedades de Hibernate se configuran dentro de `application.properties` bajo el prefijo `spring.jpa` o `spring.datasource`:
+
+```bash
+spring.datasource.url=jdbc:mysql://localhost:3306/mydatabase
+spring.datasource.username=myuser
+spring.datasource.password=mypassword
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.generate_statistics=true
+```
+
+```yml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/mydatabase
+    username: myuser
+    password: mypassword
+  jpa:
+    hibernate:
+      ddl-auto: update
+      show-sql: true
+      properties:
+        hibernate.generate_statistics: true
 ```
 
 ### [Basic configuration settings](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#basic-configuration-settings)
@@ -1618,21 +1643,23 @@ La interfaz `StatelessSession` no tiene un contexto de persistencia.
 
 El **contexto de persistencia** es un concepto fundamental en Hibernate y JPA que gestiona las entidades que están en un ciclo de vida de persistencia dentro de una sesión.
 
+Es un área de memoria gestionada por el `EntityManager` (o la `Session` en Hibernate) donde se almacenan y se controlan las entidades que se están gestionando durante la ejecución de una transacción.
+
 Actúa como una especie de **"caché de primer nivel"**, para distinguirla de la [caché de segundo nivel](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#second-level-cache). Para cada instancia de entidad leída desde la base de datos dentro del ámbito de un contexto de persistencia, y para cada nueva entidad hecha persistente dentro del ámbito del contexto de persistencia, el contexto mantiene una asignación única del identificador de la instancia de entidad a la instancia en sí.
 
 Una instancia de entidad puede estar en uno de tres estados con respecto a un contexto de persistencia dado:
 
-- **Transitorio (Transient)**: nunca ha sido persistente y no está asociada con el contexto de persistencia. Estas entidades son nuevas y no han sido guardadas en la base de datos.
+- **Transitorio (_Transient_)**: nunca ha sido persistente y no está asociada con el contexto de persistencia. Estas entidades son nuevas y no han sido guardadas en la base de datos.
 
-- **Persistente (Persistent)**: actualmente asociada con el contexto de persistencia. Cualquier cambio realizado en una entidad persistente se sincronizará automáticamente con la base de datos al final de la transacción o cuando se invoque `flush()`.
+- **Persistente (_Persistent_)**: actualmente asociada con el contexto de persistencia. Cualquier cambio realizado en una entidad persistente se sincronizará automáticamente con la base de datos al final de la transacción o cuando se invoque `flush()`.
 
-- **Separado (Detached)**: anteriormente persistente en otra sesión, pero no actualmente asociada con este contexto de persistencia. Pueden ser reconectadas a un nuevo contexto de persistencia si es necesario.
+- **Separado (_Detached_)**: anteriormente persistente en otra sesión, pero no actualmente asociada con este contexto de persistencia. Pueden ser reconectadas a un nuevo contexto de persistencia si es necesario.
 
 En cualquier momento dado, **una instancia puede estar asociada como máximo a un contexto de persistencia**.
 
-La duración de un contexto de persistencia generalmente corresponde a la duración de una transacción. Una vez que la transacción se completa, el contexto de persistencia se cierra y todas las entidades gestionadas por él se vuelven separadas (detached).
+La duración de un contexto de persistencia generalmente corresponde a **la duración de una transacción**. Una vez que la transacción se completa, el contexto de persistencia se cierra y todas las entidades gestionadas por él se vuelven separadas (_detached_).
 
-Un contexto de persistencia no debe ser compartido entre múltiples hilos o transacciones concurrentes debido a problemas de concurrencia y seguridad de subprocesos.
+> Un contexto de persistencia **no debe ser compartido entre múltiples hilos o transacciones concurrentes** debido a problemas de concurrencia y seguridad de subprocesos.
 
 Hay diversas razones para valorar los contextos de persistencia:
 
@@ -2353,7 +2380,163 @@ Por defecto, **Hibernate no guarda entidades en la caché de segundo nivel**. Pa
 
 ### [Stateless sessions](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#stateless-sessions)
 
-TODO
+Una característica de Hibernate es la interfaz [`StatelessSession`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/StatelessSession.html), que ofrece un enfoque más directo y orientado a comandos para interactuar con la base de datos.
+
+Se puede obtener una sesión sin estado desde el `SessionFactory`:
+
+```java
+StatelessSession ss = getSessionFactory().openStatelessSession();
+```
+
+Una sesión sin estado:
+
+- No tiene una **caché de primer nivel** (contexto de persistencia), ni interactúa con ninguna caché de segundo nivel, y
+
+- No implementa escritura transaccional diferida ni comprobación automática de modificaciones, por lo que todas las operaciones se **ejecutan inmediatamente** cuando se llaman explícitamente.
+
+En una sesión sin estado, siempre trabajamos con objetos _detached_ (desvinculados del [contexto de persistencia](#persistence-contexts)).
+
+Algunos métodos de la interfaz `StatelessSession`:
+
+- **`get(Class, Object)`** ➔ Obtiene un objeto separado (detached), dado su tipo y su id, ejecutando un `select`.
+
+- **`fetch(Object)`** ➔ Recupera una asociación de un objeto separado.
+
+- **`refresh(Object)`** ➔ Refresca el estado de un objeto separado ejecutando un `select`.
+
+- **`insert(Object)`** ➔ Inserta inmediatamente el estado del objeto transitorio dado en la base de datos.
+
+- **`update(Object)`** ➔ Actualiza inmediatamente el estado del objeto separado dado en la base de datos.
+
+- **`delete(Object)`** ➔ Elimina inmediatamente el estado del objeto separado dado de la base de datos.
+
+- **`upsert(Object)`** ➔ Inserta o actualiza inmediatamente el estado del objeto separado dado usando una declaración SQL `merge into`.
+  
+> No hay una operación `flush()`, por lo que `update()` siempre es explícito.
+
+En ciertas circunstancias, las sesiones sin estado son más fáciles de manejar y más sencillas de entender. Sin embargo una sesión sin estado es mucho más vulnerable a los efectos de _aliasing_ de datos, ya que es fácil obtener dos objetos Java no idénticos que representen la misma fila de una tabla de la base de datos.
+
+### [Optimistic and pessimistic locking](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#optimistic-and-pessimistic-locking)
+
+Finalmente, un aspecto del comportamiento bajo carga es la contención de datos a nivel de fila. Cuando muchas transacciones intentan leer y actualizar los mismos datos, el programa puede volverse no responsivo debido a la escalación de bloqueos, bloqueos mutuos y errores de tiempo de espera en la adquisición de bloqueos.
+
+Hay dos enfoques básicos para la **concurrencia de datos** en Hibernate:
+
+- **Bloqueo optimista** utilizando columnas [`@Version`](#version-attributes).
+
+- **Bloqueo pesimista a nivel de base de datos** utilizando la sintaxis SQL `for update` (o equivalente).
+
+En la comunidad de Hibernate, es mucho **más común utilizar el bloqueo optimista**.
+
+Donde sea posible, en un sistema multiusuario, se debe evitar mantener un bloqueo pesimista durante una interacción del usuario. De hecho, la práctica habitual es evitar tener transacciones que abarquen interacciones de usuario.
+
+> **Para sistemas multiusuario, como podría ser aplicaciones web, el bloqueo optimista es la mejor opción**.
+
+Dicho esto, también hay lugar para los bloqueos pesimistas, que a veces pueden reducir la probabilidad de retrocesos o _rollbacks_ de transacciones.
+
+Por lo tanto, los métodos `find()`, `lock()` y `refresh()` de la sesión reactiva aceptan un `LockMode` opcional. También podemos especificar un `LockMode` para una consulta. El modo de bloqueo puede utilizarse para solicitar un bloqueo pesimista o para personalizar el comportamiento del bloqueo optimista.
+
+Tipos de [`LockMode`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/LockMode.html):
+
+- **READ** ➔ Un bloqueo optimista obtenido implícitamente siempre que una entidad se lea de la base de datos usando `select`.
+
+- **OPTIMISTIC** ➔ Un bloqueo optimista obtenido cuando una entidad se lee de la base de datos, y verificado usando un `select` para comprobar la versión cuando la transacción se completa.
+
+- **OPTIMISTIC_FORCE_INCREMENT** ➔ Un bloqueo optimista obtenido cuando una entidad se lee de la base de datos, y forzado usando una actualización para incrementar la versión cuando la transacción se completa.
+
+- **WRITE** ➔ Un bloqueo pesimista obtenido implícitamente siempre que una entidad se escriba en la base de datos usando `update` o `insert`.
+
+- **PESSIMISTIC_READ** ➔ Un bloqueo pesimista para compartir.
+
+- **PESSIMISTIC_WRITE** ➔ Un bloqueo pesimista para actualización.
+
+- **PESSIMISTIC_FORCE_INCREMENT** ➔ Un bloqueo pesimista forzado usando una actualización inmediata para incrementar la versión.
+
+En Hibernate, si no especificas un `LockMode` explícitamente, se utiliza el comportamiento por defecto. Por defecto, Hibernate utiliza **_optimistic locking_** cuando se realiza una operación de lectura.
+
+Esto significa que la entidad se leerá con una versión que se verifica al finalizar la transacción para detectar posibles conflictos de concurrencia. Si no se indica un `LockMode`, **Hibernate asume que debe usar el bloqueo optimista**.
+
+### [Collecting statistics](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#statistics)
+
+La recolección de estadísticas en Hibernate se refiere a la capacidad de obtener información sobre **el rendimiento y el comportamiento** del sistema de persistencia.
+
+Para **activar la recolección de estadísticas** en Hibernate, se debe configurar la propiedad `hibernate.generate_statistics` en el archivo de configuración `hibernate.cfg.xml` o en el archivo de configuración `hibernate.properties`.
+
+Una vez que la recolección de estadísticas está activada, se puede acceder a estas estadísticas a través de la interfaz `SessionFactory`:
+
+```java
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
+
+public class StatisticsExample {
+
+    public static void main(String[] args) {
+        SessionFactory sessionFactory = // Obtener tu SessionFactory
+
+        // Activar estadísticas (si no se han activado en 'hibernate.properties')
+        sessionFactory.getStatistics().setStatisticsEnabled(true);
+
+        // Obtener estadísticas
+        Statistics stats = sessionFactory.getStatistics();
+
+        // Mostrar estadísticas
+        System.out.println("Query Execution Count: " + stats.getQueryExecutionCount());
+        System.out.println("Entity Load Count: " + stats.getEntityLoadCount());
+        System.out.println("Entity Update Count: " + stats.getEntityUpdateCount());
+
+        // Desactivar estadísticas si ya no son necesarias
+        sessionFactory.getStatistics().setStatisticsEnabled(false);
+    }
+}
+```
+
+Las estadísticas recolectadas pueden incluir:
+
+- **Conteo de Consultas Ejecutadas**: Número total de consultas ejecutadas.
+
+- **Tiempo de Consulta**: Tiempo total gastado en la ejecución de consultas.
+
+- **Conteo de Entidades Cargadas**: Número de veces que se cargaron entidades desde la base de datos.
+
+- **Conteo de Entidades Actualizadas**: Número de veces que se actualizaron entidades en la base de datos.
+
+- **Conteo de Entidades Eliminadas**: Número de veces que se eliminaron entidades.
+
+### [Tracking down slow queries](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#slow-queries)
+
+Cuando se descubre una consulta SQL de bajo rendimiento en producción, a veces puede ser difícil rastrear exactamente de dónde proviene la consulta en el código Java.
+
+Hibernate ofrece dos propiedades de configuración que pueden **facilitar la identificación de una consulta lenta** y encontrar su origen:
+
+- `hibernate.log_slow_query` ➔ que indica el tiempo mínimo de ejecución en milisegundos que caracteriza una consulta "lenta".
+
+- `hibernate.use_sql_comments` ➔ que indica si se debe o no anteponer comentarios al SQL ejecutado.
+
+El texto que se antepone como comentario SQL es el texto de la consulta HQL, lo que facilita su localización dentro del código Java.
+
+El texto del comentario puede personalizarse mediante `Query.setComment(comment)` o `Query.setHint(AvailableHints.HINT_COMMENT, comment)`, o directamente mediante la anotación `@NamedQuery`.
+
+### [Adding indexes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#indexes)
+
+La anotación [`@Index`](https://jakarta.ee/specifications/platform/9/apidocs/jakarta/persistence/) se puede utilizar para agregar un índice a una tabla:
+
+```java
+@Entity
+@Table(indexes=@Index(columnList="title, year, publisher_id"))
+class Book { /*...*/ }
+```
+
+Es posible especificar un orden para una columna indexada, o que el índice sea insensible a mayúsculas y minúsculas:
+
+```java
+@Entity
+@Table(indexes=@Index(columnList="(lower(title)), year desc, publisher_id"))
+class Book { /*...*/ }
+```
+
+Esto permite crear un índice personalizado para una consulta particular.
+
+> Se pueden crear índices personalizados para consultas específicas, pero es más adecuado definir y gestionar estos índices en **scripts SQL DDL** que en el código Java, ya que los administradores de bases de datos suelen ser los responsables de su optimización. Hibernate permite ejecutar estos scripts mediante la propiedad `javax.persistence.schema-generation.create-script-source`.
 
 ---
 
