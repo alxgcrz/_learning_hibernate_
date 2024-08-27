@@ -28,13 +28,13 @@ En resumen, Hibernate simplifica el desarrollo de aplicaciones Java al proporcio
 
 ### [Including Hibernate in your project build](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#required-dependencies)
 
-Para utilizar Hibernate fuera del entorno de un contenedor como WildFly o [Quarkus](https://quarkus.io/guides/hibernate-orm), se necesita:
+Para utilizar Hibernate fuera del entorno de un contenedor como [WildFly](https://www.wildfly.org/) o [Quarkus](https://quarkus.io/guides/hibernate-orm), se necesita:
 
 - incluir el propio Hibernate ORM, junto con el controlador JDBC apropiado, como dependencias del proyecto.
 
 - configurar Hibernate con información sobre la base de datos, especificando las propiedades de configuración.
 
-Añadir la dependencia de Hibernate con **Maven**:
+Añadir la dependencia de Hibernate en **Maven**:
 
 ```xml
 <dependencies>
@@ -78,7 +78,7 @@ Para utilizar la plataforma BOM en **Maven**:
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-platform</artifactId>
-            <version>6.5.2.Final</version>
+            <version>{version}</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -90,13 +90,15 @@ Para utilizar la plataforma BOM en **Gradle**:
 
 ```gradle
 dependencies {
-  implementation platform "org.hibernate.orm:hibernate-platform:6.5.2.Final"
+  implementation platform "org.hibernate.orm:hibernate-platform:{version}"
 
   // use the versions from the platform
   implementation "org.hibernate.orm:hibernate-core"
   implementation "jakarta.transaction:jakarta.transaction-api"
 }
 ```
+
+> :warning: **Sustituir {version}** por la última versión o la versión correspondiente.
 
 También se debe **agregar una dependencia para el controlador JDBC** de la base de datos utilizada:
 
@@ -136,7 +138,7 @@ Opcionalmente, también se puede agregar [dependencias opcionales](https://docs.
 
 ### [Configuration using JPA XML](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#configuration-jpa)
 
-Para seguir el enfoque estándar JPA, se debe proporcionar un archivo llamado `persistence.xml`, que generalmente se coloca en el directorio `META-INF` dentro del directorio de recursos del proyecto:
+Para seguir el enfoque estándar JPA, se debe proporcionar un archivo llamado `persistence.xml`, que se debe colocar en el directorio `META-INF` dentro del directorio de recursos del proyecto:
 
 ```txt
 mi-proyecto/
@@ -290,7 +292,7 @@ spring:
 
 La interfaz [`org.hibernate.cfg.AvailableSettings`](https://docs.jboss.org/hibernate/orm/6.5/javadocs/org/hibernate/cfg/AvailableSettings.html) enumera todas las propiedades de configuración que entiende Hibernate.
 
-La lista es extensa, sin embargo la mayoría de estas propiedades rara vez se necesitan y muchas **solo existen para brindar compatibilidad con versiones anteriores de Hibernate**. Con raras excepciones, el comportamiento predeterminado de cada una de estas propiedades es el recomendable.
+La lista es extensa, sin embargo la mayoría de estas propiedades rara vez se necesitan y muchas **sólo existen para brindar compatibilidad con versiones anteriores de Hibernate**. Con raras excepciones, el comportamiento predeterminado de cada una de estas propiedades es el recomendable.
 
 Las propiedades que deben configurarse para empezar son:
 
@@ -304,7 +306,7 @@ En términos de optimización de rendimiento, también es recomendable configura
 
 ### [Automatic schema export](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#automatic-schema-export)
 
-Esta característica de Hibernate es una característica que permite a Hibernate **generar y exportar automáticamente el esquema de la base de datos** basado en las entidades mapeadas en la aplicación. Esto puede incluir la creación, actualización, o eliminación de tablas, índices y llaves foráneas, entre otros elementos del esquema de la base de datos.
+Esta característica de Hibernate es una característica que permite a Hibernate **generar y exportar automáticamente el esquema de la base de datos** basado en las entidades mapeadas en la aplicación. Esto puede incluir la creación, actualización o eliminación de tablas, índices y llaves foráneas, entre otros elementos del esquema de la base de datos.
 
 Puede hacer que Hibernate infiera el esquema de su base de datos a partir de las anotaciones de mapeo que ha especificado en su código Java, y exportar el esquema al momento de la inicialización especificando una o más de las siguientes propiedades de configuración:
 
@@ -320,7 +322,7 @@ Puede hacer que Hibernate infiera el esquema de su base de datos a partir de las
 
 Esta característica es extremadamente útil para realizar pruebas. Durante las fases iniciales de desarrollo o cuando se está creando un prototipo, es útil tener Hibernate manejando automáticamente el esquema.
 
-La forma más sencilla de preinicializar una base de datos con datos de prueba o "de referencia" es colocar una lista de declaraciones SQL de inserción en un archivo llamado, por ejemplo, _'import.sql'_, y especificar la ruta a este archivo utilizando la propiedad `jakarta.persistence.sql-load-script-source`.
+La forma más sencilla de preinicializar una base de datos con datos de prueba o "de referencia" es colocar una lista de declaraciones SQL de inserción en un archivo llamado _'import.sql'_ por ejemplo, y especificar la ruta a este archivo utilizando la propiedad `jakarta.persistence.sql-load-script-source`.
 
 Este enfoque es más limpio que escribir código Java para instanciar entidades y llamar a `persist()` en cada una de ellas.
 
