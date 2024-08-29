@@ -328,61 +328,101 @@ Este enfoque es más limpio que escribir código Java para instanciar entidades 
 
 ### [Logging the generated SQL](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#logging-generated-sql)
 
-Para ver el SQL generado mientras se envía a la base de datos, tiene dos opciones.
+Existen dos opciones para **visualizar el SQL generado** mientras se envía a la base de datos.
 
 Una forma es establecer la propiedad `hibernate.show_sql=true`, y Hibernate registrará el SQL directamente en la consola. Puede hacer que la salida sea mucho más legible habilitando el formateo o el resaltado. Estas configuraciones son muy útiles para solucionar problemas con las declaraciones SQL generadas:
 
-- **hibernate.show_sql**: si es _'true'_, imprime el registro SQL directamente en la consola
+- **hibernate.show_sql=true**: imprime el registro SQL directamente en la consola
 
-- **hibernate.format_sql**: si es _'true'_, imprime el registro SQL en un formato con sangría de varias líneas
+- **hibernate.format_sql=true**: imprime el registro SQL en un formato con sangría de varias líneas
 
-- **hibernate.highlight_sql**: si es _'true'_, imprime el registro SQL con resaltado de sintaxis mediante códigos de escape ANSI
+- **hibernate.highlight_sql=true**: imprime el registro SQL con resaltado de sintaxis mediante códigos de escape ANSI
 
-Como alternativa, puede habilitar el registro en nivel de depuración (debug) para la categoría `org.hibernate.SQL` utilizando su implementación preferida de logging **SLF4J**.
+Como alternativa, puede habilitar el registro en nivel de depuración (debug) para la categoría `org.hibernate.SQL` utilizando una implementación de logging con [SLF4J](https://slf4j.org/).
 
 ### [Minimizing repetitive mapping information](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#minimizing)
 
-Las propiedades `hibernate.default_schema` o `hibernate.default_catalog`  son muy útiles para minimizar la cantidad de información que necesitará especificar explícitamente en las anotaciones `@Table` y `@Column`. [Más información](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#object-relational-mapping)
+Las propiedades `hibernate.default_schema` o `hibernate.default_catalog` son muy útiles para minimizar la cantidad de información que necesitará especificar explícitamente en las anotaciones `@Table` y `@Column`.
 
-Escribir su propia `PhysicalNamingStrategy` y/o `ImplicitNamingStrategy` es una forma especialmente buena de reducir el desorden de las anotaciones en las clases de entidad, e implementar sus convenciones de nomenclatura de base de datos.
+- `hibernate.default_schema`: nombre de esquema predeterminado para entidades que no declaran explícitamente uno
 
-Por lo tanto, se debería hacer para cualquier modelo de datos que no sea trivial. [Más información](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#naming-strategies)
+- `hibernate.default_catalog`: nombre de catálogo predeterminado para entidades que no declaran explícitamente uno
+
+Escribir su propia `PhysicalNamingStrategy` y/o `ImplicitNamingStrategy` es una forma especialmente buena de reducir el desorden de las anotaciones en las clases de entidad, e implementar sus convenciones de nomenclatura de base de datos, teniendo en cuenta las posibles [estrategias de nomenclatura](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#naming-strategies).
+
+Por lo tanto, se debería hacer para cualquier modelo de datos que no sea trivial.
 
 ### [Nationalized character data in SQL Server](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#nationalized-chars)
 
-Por defecto, los tipos _'char'_ y _'varchar'_ de **SQL Server** no admiten datos Unicode. Sin embargo, una cadena de Java puede contener cualquier carácter Unicode. Por lo tanto, si está trabajando con SQL Server, es posible que necesite forzar a Hibernate a usar los tipos de columna _'nchar'_ y _'nvarchar'_:
+Por defecto, los tipos _'char'_ y _'varchar'_ de **SQL Server** no admiten datos Unicode. Sin embargo, una cadena de Java puede contener cualquier carácter Unicode. Por lo tanto, si se está trabajando con SQL Server, es posible que se necesite forzar a Hibernate a usar los tipos de columna _'nchar'_ y _'nvarchar'_:
 
 - **hibernate.use_nationalized_character_data**: _'nchar'_ y _'nvarchar'_ en lugar de _'char'_ y _'varchar'_
 
 Por otro lado, si solo algunos campos almacenan datos nacionalizados, utilice la anotación `@Nationalized` para indicar los campos de sus entidades que mapean estos columnas.
 
-Como alternativa, puede configurar SQL Server para usar la intercalación habilitada para UTF-8 (_UTF8).
+Como alternativa, se puede configurar SQL Server para usar la intercalación habilitada para UTF-8 (_UTF8).
 
 ## [Entities](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entities)
 
-Una entidad es una clase Java que representa datos en una tabla de una base de datos relacional. Decimos que la entidad hace un mapeo o se mapea a la tabla.
+Una entidad es una clase Java anotada con `@Enitity` que representa **datos en una tabla** de una base de datos relacional. Decimos que la entidad hace un mapeo o se mapea a la tabla.
 
-Una entidad tiene atributos, que son propiedades o campos que se mapean a columnas de la tabla. En particular, cada entidad debe tener un identificador o id, que se mapea a la clave primaria de la tabla. El id nos permite asociar de manera única una fila de la tabla con una instancia de la clase Java, al menos dentro de un contexto de persistencia dado.
+Una entidad tiene **atributos**, que son propiedades o campos que se mapean a columnas de la tabla. En particular, cada entidad debe tener un identificador o id, que se mapea a la clave primaria de la tabla. El id nos permite asociar de manera única una fila de la tabla con una instancia de la clase Java, al menos dentro de un contexto de persistencia dado.
 
 Una instancia de una clase Java no puede sobrevivir fuera de la máquina virtual a la que pertenece. Sin embargo, podemos pensar que una instancia de entidad tiene un ciclo de vida que trasciende una instancia particular en la memoria. Al proporcionar su id a Hibernate, podemos volver a materializar la instancia en un nuevo contexto de persistencia, siempre que la fila asociada esté presente en la base de datos. Por lo tanto, las operaciones `persist()` y `remove()` pueden considerarse como marcadores del inicio y el fin del ciclo de vida de una entidad, al menos en cuanto a persistencia se refiere.
 
+Las operaciones `persist()`, `merge()`, `remove()` y `detach()` son parte del ciclo de vida de una entidad en JPA.
+
 Así, un id representa la identidad persistente de una entidad, una identidad que sobrevive a una instancia particular en la memoria. Y esta es una diferencia importante entre la clase de entidad en sí misma y los valores de sus atributos: la entidad tiene una identidad persistente y un ciclo de vida bien definido en relación con la persistencia, mientras que un `String` o `List` que representa uno de sus valores de atributo no lo tiene.
 
-Una entidad generalmente tiene asociaciones con otras entidades. Típicamente, una asociación entre dos entidades se mapea a una clave foránea en una de las tablas de la base de datos. Un grupo de entidades mutuamente asociadas a menudo se denomina modelo de dominio, aunque también es perfectamente válido el término modelo de datos.
+Una entidad generalmente tiene asociaciones con otras entidades. Típicamente, una asociación entre dos entidades se mapea a una clave foránea en una de las tablas de la base de datos. Estas asociaciones pueden ser de varios tipos: **uno a uno** (`@OneToOne`), **uno a muchos** (`@OneToMany`), **muchos a uno** (`@ManyToOne`), y **muchos a muchos** (`@ManyToMany`). Un grupo de entidades mutuamente asociadas a menudo se denomina modelo de dominio, aunque también es perfectamente válido el término modelo de datos.
 
 ### [Entity classes](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entity-clases)
 
 Un entidad debe ser **una clase no final** y **tener un constructor no privado y sin parámetros**.
 
-Por otro lado, la clase de entidad puede ser tanto concreta como abstracta, y puede tener cualquier cantidad de constructores adicionales. La clase entidad también puede ser una clase interna estática.
+```java
+@Entity
+public class Book {
+    @Id
+    private Long id;
+    private String nombre;
+
+    // Constructor por defecto (necesario para Hibernate)
+    public Book() { }
+
+    // Constructor con parámetros
+    public Book(Long id, String nombre) {
+        this.id = id;
+        this.nombre = nombre;
+    }
+
+    // Getters y setters
+    // ...
+}
+```
+
+Si una clase de entidad en Hibernate no tiene constructores con parámetros, no es necesario definir explícitamente un constructor por defecto, ya que Java lo proporciona automáticamente.
+
+```java
+@Entity
+public class Book {
+    @Id
+    private Long id;
+    private String nombre;
+
+    // Getters y setters
+    // ...
+}
+```
+
+Por otro lado, la clase de entidad puede ser tanto **concreta** como **abstracta**, y puede tener cualquier cantidad de constructores adicionales. La clase entidad también puede ser una **clase interna estática**.
 
 Cada clase de entidad debe tener la anotación `@Entity`:
 
 ```java
 @Entity
 class Book {
-    Book() {}
-    ...
+    // ...
 }
 ```
 
@@ -402,13 +442,13 @@ Alternativamente, la clase puede identificarse como un tipo de entidad proporcio
 
 ### [Access types](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#access-type)
 
-En Hibernate, cada clase entidad puede definirse con un tipo de acceso predeterminado, que puede ser:
+En Hibernate, cada clase entidad puede definirse con un **tipo de acceso predeterminado**, que puede ser:
 
-- **acceso directo a campos** (_'field access'_)
+- **acceso directo a campos o _'field access'_**
 
-- **acceso a propiedades** (_'property access'_)
+- **acceso a propiedades o _'property access'_**
 
-Esta configuración determina cómo Hibernate accede y maneja los atributos de la clase entidad. Cuando se utiliza **acceso directo a campos**, los atributos de la clase entidad se acceden directamente a través de los campos de la clase. En este caso, Hibernate mapea directamente los atributos a los campos correspondientes en la tabla de la base de datos:
+Esta configuración determina cómo Hibernate accede y maneja los atributos de la clase entidad. Cuando se utiliza **acceso directo a campos**, los atributos de la clase entidad se anotan directamente, permitiendo que Hibernate acceda sin intermediarios a los campos de la clase. En este caso, Hibernate mapea directamente los atributos a los campos correspondientes en la tabla de la base de datos:
 
 ```java
 @Entity
@@ -423,7 +463,7 @@ public class Product {
 }
 ```
 
-Cuando se utiliza **acceso a propiedades**, Hibernate accede a los atributos a través de métodos _'getter'_ y _'setter'_ en lugar de acceder directamente a los campos:
+Cuando se utiliza **acceso a propiedades**, se anota el método _'getter'_, permitiendo que Hibernate acceda a los campos a través de este método, en lugar de acceder directamente a los campos:
 
 ```java
 @Entity
@@ -451,11 +491,15 @@ public class Product {
 }
 ```
 
-Hibernate determina automáticamente el tipo de acceso de la entidad basándose en la ubicación de las anotaciones a nivel de atributo:
+Hibernate **determina automáticamente** el tipo de acceso de toda la entidad basándose en la **ubicación** de la primera anotación que encuentre en la clase de entidad:
 
-- Si un atributo está anotado directamente con `@Id`, Hibernate utiliza **acceso directo a campos** para ese atributo.
+- Si la primera anotación, como por ejemplo `@Id`, está en un campo, Hibernate utilizará **acceso directo a campos** en toda la clase.
 
-- Si un método _'getter'_ está anotado con `@Id`, Hibernate utiliza **acceso a propiedades** para ese atributo.
+- Si la primera anotación, como por ejemplo `@Id`, está en un método _getter_, Hibernate utilizará **acceso a propiedades** en toda la clase.
+
+Por lo tanto, si no se especifica explícitamente el tipo de acceso utilizando la anotación [`@Access`](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/access), Hibernate determinará automáticamente el [tipo de acceso](https://jakarta.ee/specifications/platform/10/apidocs/jakarta/persistence/accesstype) en función de dónde se encuentran las anotaciones en la clase de entidad.
+
+> La anotación `@Column` es **opcional** en Hibernate. Si no se especifica, Hibernate mapeará automáticamente los campos de la clase a las columnas de la tabla de la base de datos con el mismo nombre. Sin embargo, `@Column` puede ser útil para personalizar el mapeo, como cambiar el nombre de la columna, definir la longitud, establecer si es nullable, entre otros.
 
 ### [Entity class inheritance](https://docs.jboss.org/hibernate/orm/6.5/introduction/html_single/Hibernate_Introduction.html#entity-inheritance)
 
@@ -2654,8 +2698,9 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 ### Jakarta JPA
 
 - <https://jakarta.ee/specifications/persistence/3.2/>
-- [Jakarta JPA](https://jakarta.ee/learn/docs/jakartaee-tutorial/current/persist/persistence-intro/persistence-intro.html)
+- <https://jakarta.ee/learn/docs/jakartaee-tutorial/current/persist/persistence-intro/persistence-intro.html>
 - <https://jakarta.ee/specifications/platform/10/apidocs/>
+- <https://www.baeldung.com/category/persistence/jpa>
 
 ## Licencia
 
