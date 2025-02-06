@@ -2684,23 +2684,19 @@ En cambio, las anotaciones que no son del estándar y han sido añadidas por Hib
 
 ---
 
-## Referencias
+## Enlaces
 
 ### Hibernate
 
-- <https://hibernate.org>
-- <https://hibernate.org/orm/documentation/6.5>
-- <https://hibernate.org/orm/documentation/getting-started>
-- [Hibernate Query Language](https://docs.jboss.org/hibernate/orm/6.5/querylanguage/html_single/Hibernate_Query_Language.html)
-- <https://docs.jboss.org/hibernate/orm/6.5/javadocs/>
-- <https://www.baeldung.com/learn-jpa-hibernate>
+- 🔸 [Hibernate](https://hibernate.org/)
+- [Learn JPA & Hibernate Series - Baeldung](https://www.baeldung.com/learn-jpa-hibernate>)
 
 ### Jakarta JPA
 
-- <https://jakarta.ee/specifications/persistence/3.2/>
-- <https://jakarta.ee/learn/docs/jakartaee-tutorial/current/persist/persistence-intro/persistence-intro.html>
-- <https://jakarta.ee/specifications/platform/10/apidocs/>
-- <https://www.baeldung.com/category/persistence/jpa>
+- 🔸 [Jakarta Persistence](https://jakarta.ee/specifications/persistence/)
+- [Jakarta Persistence Specification Project](https://jakartaee.github.io/persistence/)
+- [Introduction to Jakarta Persistence](https://jakarta.ee/learn/docs/jakartaee-tutorial/current/persist/persistence-intro/persistence-intro.html)
+- [JPA - Baeldung](https://www.baeldung.com/category/persistence/jpa)
 
 ## Licencia
 
